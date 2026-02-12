@@ -1,6 +1,7 @@
 import { Router, Response } from 'express';
 import { pool } from '../db/pool';
 import { jwtAuth, requireRole, AuthRequest } from '../middleware/auth';
+import { processJob } from '../workers/ingestion-worker';
 
 const router = Router();
 router.use(jwtAuth);
@@ -10,11 +11,15 @@ router.use(requireRole('admin'));
 router.post('/start-from-link', async (req: AuthRequest, res: Response) => {
   const { url, month } = req.body;
 
+  if (!url) {
+    return res.status(400).json({ error: 'URL is required' });
+  }
+
   try {
-    // The file types to process
+    // The file types to process (order matters: reference tables first)
     const fileTypes = [
+      'municipios', 'paises', 'naturezas', 'qualificacoes', 'cnaes',
       'empresas', 'estabelecimentos', 'socios',
-      'municipios', 'naturezas', 'qualificacoes', 'paises', 'cnaes',
     ];
 
     const jobs = [];
@@ -27,10 +32,20 @@ router.post('/start-from-link', async (req: AuthRequest, res: Response) => {
       jobs.push(result.rows[0]);
     }
 
-    // In a real implementation, trigger background processing here
-    // using a job queue like Bull, pg-boss, or similar
+    // Start processing in background (non-blocking)
+    // Process reference tables first, then main tables
+    (async () => {
+      for (const job of jobs) {
+        try {
+          await processJob(job.id, job.file_type, job.url);
+        } catch (err) {
+          console.error(`Job ${job.id} (${job.file_type}) failed:`, err);
+        }
+      }
+      console.log('🏁 All ingestion jobs finished');
+    })();
 
-    res.status(201).json({ message: 'Ingestion started', jobs });
+    res.status(201).json({ message: 'Ingestão iniciada', jobs });
   } catch (error) {
     console.error('Ingestion error:', error);
     res.status(500).json({ error: 'Failed to start ingestion' });
