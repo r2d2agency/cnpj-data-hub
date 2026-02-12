@@ -1,32 +1,113 @@
 import { Router, Response } from 'express';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
 import { pool } from '../db/pool';
 import { jwtAuth, requireRole, AuthRequest } from '../middleware/auth';
-import { processJob } from '../workers/ingestion-worker';
+import { processJob, processUploadedZip } from '../workers/ingestion-worker';
 
 const router = Router();
 router.use(jwtAuth);
 router.use(requireRole('admin'));
 
+// Multer config — save to /tmp/ingestion-uploads
+const uploadDir = path.join('/tmp', 'ingestion-uploads');
+if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+
+const storage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, uploadDir),
+  filename: (_req, file, cb) => cb(null, `${Date.now()}-${file.originalname}`),
+});
+
+const upload = multer({
+  storage,
+  fileFilter: (_req, file, cb) => {
+    if (file.originalname.toLowerCase().endsWith('.zip')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Apenas arquivos .zip são aceitos'));
+    }
+  },
+  limits: { fileSize: 10 * 1024 * 1024 * 1024 }, // 10 GB
+});
+
+// POST /api/v1/ingestion/upload — manual ZIP upload
+router.post('/upload', upload.single('file'), async (req: AuthRequest, res: Response) => {
+  const file = req.file;
+  const { file_type } = req.body;
+
+  if (!file) {
+    return res.status(400).json({ error: 'Arquivo ZIP é obrigatório' });
+  }
+
+  const validTypes = ['municipios', 'paises', 'naturezas', 'qualificacoes', 'cnaes', 'empresas', 'estabelecimentos', 'socios'];
+  if (!file_type || !validTypes.includes(file_type)) {
+    // Clean up uploaded file
+    fs.unlink(file.path, () => {});
+    return res.status(400).json({ error: `Tipo inválido. Valores aceitos: ${validTypes.join(', ')}` });
+  }
+
+  try {
+    const result = await pool.query(
+      `INSERT INTO ingestion_jobs (source, file_name, file_type, status)
+       VALUES ('upload', $1, $2, 'pending') RETURNING *`,
+      [file.originalname, file_type]
+    );
+    const job = result.rows[0];
+
+    // Process in background
+    (async () => {
+      try {
+        await processUploadedZip(job.id, file_type, file.path);
+      } catch (err) {
+        console.error(`Upload job ${job.id} failed:`, err);
+      } finally {
+        // Clean up file after processing
+        fs.unlink(file.path, () => {});
+      }
+    })();
+
+    res.status(201).json({ message: 'Upload recebido, processamento iniciado', job });
+  } catch (error) {
+    fs.unlink(file.path, () => {});
+    console.error('Upload error:', error);
+    res.status(500).json({ error: 'Falha ao iniciar processamento do upload' });
+  }
+});
+
 // POST /api/v1/ingestion/start-from-link
 router.post('/start-from-link', async (req: AuthRequest, res: Response) => {
-  const { url, month } = req.body;
+  const { url, month, skip_completed } = req.body;
 
   if (!url) {
     return res.status(400).json({ error: 'URL is required' });
   }
 
   try {
-    // The file types to process (order matters: reference tables first)
     const fileTypes = [
       'municipios', 'paises', 'naturezas', 'qualificacoes', 'cnaes',
       'empresas', 'estabelecimentos', 'socios',
     ];
 
-    // Normalize: remove trailing slash
+    // Check which file types already have completed jobs (skip them)
+    let typesToProcess = fileTypes;
+    if (skip_completed !== false) {
+      const completed = await pool.query(
+        `SELECT DISTINCT file_type FROM ingestion_jobs WHERE status = 'completed'`
+      );
+      const completedTypes = new Set(completed.rows.map((r: any) => r.file_type));
+      typesToProcess = fileTypes.filter(ft => !completedTypes.has(ft));
+
+      if (typesToProcess.length === 0) {
+        return res.json({ message: 'Todos os tipos já foram processados com sucesso', jobs: [], skipped: fileTypes });
+      }
+    }
+
     const baseUrl = url.replace(/\/+$/, '');
+    const skipped = fileTypes.filter(ft => !typesToProcess.includes(ft));
 
     const jobs = [];
-    for (const fileType of fileTypes) {
+    for (const fileType of typesToProcess) {
       const result = await pool.query(
         `INSERT INTO ingestion_jobs (source, url, file_type, status)
          VALUES ('link', $1, $2, 'pending') RETURNING *`,
@@ -35,8 +116,6 @@ router.post('/start-from-link', async (req: AuthRequest, res: Response) => {
       jobs.push(result.rows[0]);
     }
 
-    // Start processing in background (non-blocking)
-    // Process reference tables first, then main tables
     (async () => {
       for (const job of jobs) {
         try {
@@ -48,7 +127,11 @@ router.post('/start-from-link', async (req: AuthRequest, res: Response) => {
       console.log('🏁 All ingestion jobs finished');
     })();
 
-    res.status(201).json({ message: 'Ingestão iniciada', jobs });
+    res.status(201).json({
+      message: `Ingestão iniciada para ${typesToProcess.length} tipo(s)`,
+      jobs,
+      skipped,
+    });
   } catch (error) {
     console.error('Ingestion error:', error);
     res.status(500).json({ error: 'Failed to start ingestion' });
@@ -93,7 +176,7 @@ router.get('/stats', async (_req: AuthRequest, res: Response) => {
   res.json(stats.rows[0]);
 });
 
-// GET /api/v1/ingestion/logs — all logs or filtered by job_id / level
+// GET /api/v1/ingestion/logs
 router.get('/logs', async (req: AuthRequest, res: Response) => {
   const { job_id, level, limit: lim } = req.query;
   const conditions: string[] = [];
@@ -126,7 +209,7 @@ router.get('/logs', async (req: AuthRequest, res: Response) => {
   res.json({ data: result.rows });
 });
 
-// DELETE /api/v1/ingestion/logs — clear logs
+// DELETE /api/v1/ingestion/logs
 router.delete('/logs', async (req: AuthRequest, res: Response) => {
   const { job_id } = req.query;
   try {
