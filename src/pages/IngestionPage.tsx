@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Upload, Link2, Play, CheckCircle2, AlertCircle, Clock, Loader2, RefreshCw, Download, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
+import { useState, useRef } from 'react';
+import { Upload, Link2, Play, CheckCircle2, AlertCircle, Clock, Loader2, RefreshCw, Download, Trash2, ChevronDown, ChevronUp, FileArchive } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,7 +7,8 @@ import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { fetchIngestionJobs, startIngestion, clearIngestionJobs } from '@/lib/api';
+import { Badge } from '@/components/ui/badge';
+import { fetchIngestionJobs, startIngestion, clearIngestionJobs, uploadIngestionZip } from '@/lib/api';
 import { toast } from '@/hooks/use-toast';
 
 const statusIcons: Record<string, React.ReactNode> = {
@@ -24,11 +25,27 @@ const statusLabels: Record<string, string> = {
   downloading: 'Baixando', pending: 'Na fila', error: 'Erro',
 };
 
+const FILE_TYPE_OPTIONS = [
+  { value: 'municipios', label: 'Municípios' },
+  { value: 'paises', label: 'Países' },
+  { value: 'naturezas', label: 'Naturezas Jurídicas' },
+  { value: 'qualificacoes', label: 'Qualificações' },
+  { value: 'cnaes', label: 'CNAEs' },
+  { value: 'empresas', label: 'Empresas' },
+  { value: 'estabelecimentos', label: 'Estabelecimentos' },
+  { value: 'socios', label: 'Sócios' },
+];
+
 export default function IngestionPage() {
   const queryClient = useQueryClient();
   const [linkUrl, setLinkUrl] = useState('');
   const [selectedMonth, setSelectedMonth] = useState('2026-01');
   const [expandedJob, setExpandedJob] = useState<string | null>(null);
+
+  // Upload state
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadFileType, setUploadFileType] = useState('empresas');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   const { data: jobs = [], isLoading } = useQuery({
     queryKey: ['ingestion-jobs'],
@@ -42,9 +59,27 @@ export default function IngestionPage() {
 
   const startMut = useMutation({
     mutationFn: () => startIngestion(linkUrl, selectedMonth),
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ['ingestion-jobs'] });
+      const skipped = data.skipped || [];
+      const msg = skipped.length > 0
+        ? `Ingestão iniciada. Pulados (já concluídos): ${skipped.join(', ')}`
+        : 'Ingestão iniciada';
+      toast({ title: msg });
+    },
+    onError: (err: Error) => toast({ title: 'Erro', description: err.message, variant: 'destructive' }),
+  });
+
+  const uploadMut = useMutation({
+    mutationFn: () => {
+      if (!selectedFile) throw new Error('Selecione um arquivo');
+      return uploadIngestionZip(selectedFile, uploadFileType);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ingestion-jobs'] });
-      toast({ title: 'Ingestão iniciada' });
+      setSelectedFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      toast({ title: 'Upload recebido, processamento iniciado' });
     },
     onError: (err: Error) => toast({ title: 'Erro', description: err.message, variant: 'destructive' }),
   });
@@ -58,8 +93,14 @@ export default function IngestionPage() {
     onError: (err: Error) => toast({ title: 'Erro', description: err.message, variant: 'destructive' }),
   });
 
+  const completedTypes = new Set(jobs.filter((j: any) => j.status === 'completed').map((j: any) => j.file_type));
   const errorCount = jobs.filter((j: any) => j.status === 'error').length;
   const hasJobs = jobs.length > 0;
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] || null;
+    setSelectedFile(file);
+  };
 
   return (
     <div className="p-6 space-y-6">
@@ -67,6 +108,18 @@ export default function IngestionPage() {
         <h1 className="text-2xl font-bold text-foreground">Ingestão de Dados</h1>
         <p className="text-sm text-muted-foreground mt-1">Importe e processe arquivos da Receita Federal</p>
       </div>
+
+      {/* Completed types badges */}
+      {completedTypes.size > 0 && (
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-xs text-muted-foreground">Já processados:</span>
+          {Array.from(completedTypes).map(ft => (
+            <Badge key={ft} variant="outline" className="text-[10px] bg-success/10 text-success border-success/30">
+              <CheckCircle2 className="h-3 w-3 mr-1" />{ft}
+            </Badge>
+          ))}
+        </div>
+      )}
 
       <Tabs defaultValue="link" className="space-y-4">
         <TabsList>
@@ -91,6 +144,9 @@ export default function IngestionPage() {
               <Label>URL do Diretório da Receita Federal</Label>
               <Input value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} placeholder="https://arquivos.receitafederal.gov.br/..." className="mt-1.5 font-mono text-xs" />
             </div>
+            <p className="text-xs text-muted-foreground">
+              Tipos já concluídos serão automaticamente pulados. Para reprocessar, limpe o histórico primeiro.
+            </p>
             <Button className="w-full" onClick={() => startMut.mutate()} disabled={startMut.isPending || !linkUrl}>
               {startMut.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Play className="h-4 w-4 mr-2" />}
               Iniciar Processamento
@@ -99,16 +155,72 @@ export default function IngestionPage() {
         </TabsContent>
 
         <TabsContent value="upload">
-          <div className="rounded-lg border bg-card p-5">
-            <div className="border-2 border-dashed border-border rounded-lg p-10 text-center">
-              <Upload className="h-10 w-10 mx-auto mb-3 text-muted-foreground/40" />
-              <p className="text-sm font-medium text-foreground">Upload manual em desenvolvimento</p>
-              <p className="text-xs text-muted-foreground mt-1">Use a opção Via Link RF por enquanto</p>
+          <div className="rounded-lg border bg-card p-5 space-y-4">
+            <div>
+              <Label>Tipo de Arquivo</Label>
+              <Select value={uploadFileType} onValueChange={setUploadFileType}>
+                <SelectTrigger className="w-56 mt-1.5"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {FILE_TYPE_OPTIONS.map(opt => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      <span className="flex items-center gap-2">
+                        {opt.label}
+                        {completedTypes.has(opt.value) && <CheckCircle2 className="h-3 w-3 text-success" />}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
+
+            <div>
+              <Label>Arquivo ZIP</Label>
+              <div
+                className="border-2 border-dashed border-border rounded-lg p-6 text-center mt-1.5 cursor-pointer hover:border-primary/50 hover:bg-muted/30 transition-colors"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".zip"
+                  className="hidden"
+                  onChange={handleFileChange}
+                />
+                {selectedFile ? (
+                  <div className="flex items-center justify-center gap-3">
+                    <FileArchive className="h-8 w-8 text-primary" />
+                    <div className="text-left">
+                      <p className="text-sm font-medium text-foreground">{selectedFile.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {(selectedFile.size / 1024 / 1024).toFixed(1)} MB
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <Upload className="h-10 w-10 mx-auto mb-3 text-muted-foreground/40" />
+                    <p className="text-sm font-medium text-foreground">Clique para selecionar um arquivo ZIP</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Ex: Empresas0.zip, Municipios.zip, Socios3.zip
+                    </p>
+                  </>
+                )}
+              </div>
+            </div>
+
+            <Button
+              className="w-full"
+              onClick={() => uploadMut.mutate()}
+              disabled={uploadMut.isPending || !selectedFile}
+            >
+              {uploadMut.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
+              Enviar e Processar
+            </Button>
           </div>
         </TabsContent>
       </Tabs>
 
+      {/* Job history */}
       <div className="rounded-lg border bg-card p-5">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-base font-semibold text-foreground">Histórico de Processamento</h2>
@@ -163,6 +275,9 @@ export default function IngestionPage() {
                           {job.file_name || job.file_type}
                         </span>
                         <span className="badge-status badge-inactive text-[10px]">{job.file_type}</span>
+                        {job.source === 'upload' && (
+                          <Badge variant="outline" className="text-[10px]">upload</Badge>
+                        )}
                         {job.records_processed > 0 && (
                           <span className="text-[10px] font-mono text-muted-foreground">
                             {Number(job.records_processed).toLocaleString('pt-BR')} registros

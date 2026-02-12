@@ -1,6 +1,7 @@
 import axios from 'axios';
 import * as unzipper from 'unzipper';
 import csv from 'csv-parser';
+import fs from 'fs';
 import { pool } from '../db/pool';
 import { Readable } from 'stream';
 
@@ -323,5 +324,54 @@ export async function processJob(jobId: string, fileType: string, baseUrl: strin
     const errMsg = error.message?.substring(0, 500) || 'Erro desconhecido';
     await updateJobStatus(jobId, 'error', 0, { error_message: errMsg });
     await log(jobId, 'error', `Job falhou: ${errMsg}`, error.stack?.substring(0, 1000));
+  }
+}
+
+// Process a manually uploaded ZIP file
+export async function processUploadedZip(jobId: string, fileType: string, filePath: string) {
+  const config = FILE_CONFIGS[fileType];
+  if (!config) {
+    await updateJobStatus(jobId, 'error', 0, { error_message: `Unknown file type: ${fileType}` });
+    await log(jobId, 'error', `Tipo de arquivo desconhecido: ${fileType}`);
+    return;
+  }
+
+  try {
+    await log(jobId, 'info', `Processando upload manual para ${fileType}: ${filePath.split('/').pop()}`);
+
+    if (!config.conflictKey) {
+      await log(jobId, 'warn', `Truncando tabela ${config.table} antes da reimportação`);
+      await pool.query(`TRUNCATE TABLE ${config.table}`);
+    }
+
+    await updateJobStatus(jobId, 'extracting', 20);
+    await log(jobId, 'info', `Extraindo ZIP do upload...`);
+
+    const fileStream = fs.createReadStream(filePath);
+    const zip = fileStream.pipe(unzipper.Parse({ forceStream: true }));
+    let totalRecords = 0;
+
+    for await (const entry of zip) {
+      const fileName = (entry as any).path as string;
+      if (fileName.toUpperCase().endsWith('.CSV') || fileName.toUpperCase().endsWith('.ESTABELE') || !fileName.includes('.')) {
+        await log(jobId, 'info', `Processando CSV: ${fileName}`);
+        await updateJobStatus(jobId, 'processing', 50);
+        totalRecords += await processCSVStream(entry as any, config, jobId);
+      } else {
+        await log(jobId, 'debug', `Ignorando arquivo: ${fileName}`);
+        (entry as any).autodrain();
+      }
+    }
+
+    await updateJobStatus(jobId, 'completed', 100, {
+      records_processed: totalRecords,
+      total_records: totalRecords,
+    });
+
+    await log(jobId, 'info', `✅ Upload concluído: ${totalRecords.toLocaleString('pt-BR')} registros para ${fileType}`);
+  } catch (error: any) {
+    const errMsg = error.message?.substring(0, 500) || 'Erro desconhecido';
+    await updateJobStatus(jobId, 'error', 0, { error_message: errMsg });
+    await log(jobId, 'error', `Upload falhou: ${errMsg}`, error.stack?.substring(0, 1000));
   }
 }

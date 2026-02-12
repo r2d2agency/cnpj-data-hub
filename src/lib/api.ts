@@ -110,7 +110,26 @@ export function fetchIngestionJobs() {
 }
 
 export function startIngestion(url: string, month: string) {
-  return request<any>('/ingestion/start-from-link', { method: 'POST', body: JSON.stringify({ url, month }) });
+  return request<any>('/ingestion/start-from-link', { method: 'POST', body: JSON.stringify({ url, month, skip_completed: true }) });
+}
+
+export async function uploadIngestionZip(file: File, fileType: string) {
+  const token = getToken();
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('file_type', fileType);
+
+  const res = await fetch(`${API_BASE}/ingestion/upload`, {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: 'Upload failed' }));
+    throw new Error(body.error || 'Upload failed');
+  }
+  return res.json();
 }
 
 export function clearIngestionJobs(status?: string) {
