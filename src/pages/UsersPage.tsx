@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose,
+  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose,
 } from '@/components/ui/dialog';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
@@ -94,7 +94,7 @@ export default function UsersPage() {
         <Dialog open={isCreateOpen} onOpenChange={(open) => { setIsCreateOpen(open); if (!open) resetForm(); }}>
           <DialogTrigger asChild><Button><Plus className="h-4 w-4 mr-2" />Novo Usuário</Button></DialogTrigger>
           <DialogContent>
-            <DialogHeader><DialogTitle>Novo Usuário</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>Novo Usuário</DialogTitle><DialogDescription>Preencha os dados para criar um novo usuário</DialogDescription></DialogHeader>
             <div className="space-y-4">
               <div><Label>Nome</Label><Input value={formName} onChange={e => setFormName(e.target.value)} placeholder="Nome completo" /></div>
               <div><Label>Email</Label><Input type="email" value={formEmail} onChange={e => setFormEmail(e.target.value)} placeholder="email@empresa.com" /></div>
@@ -125,7 +125,7 @@ export default function UsersPage() {
       {/* Edit Dialog */}
       <Dialog open={!!editUser} onOpenChange={(open) => { if (!open) { setEditUser(null); resetForm(); } }}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Editar Usuário</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Editar Usuário</DialogTitle><DialogDescription>Altere os dados do usuário</DialogDescription></DialogHeader>
           <div className="space-y-4">
             <div><Label>Nome</Label><Input value={formName} onChange={e => setFormName(e.target.value)} /></div>
             <div><Label>Email</Label><Input type="email" value={formEmail} onChange={e => setFormEmail(e.target.value)} /></div>
@@ -164,7 +164,7 @@ export default function UsersPage() {
       {/* Password Dialog */}
       <Dialog open={!!passwordUser} onOpenChange={(open) => { if (!open) { setPasswordUser(null); setNewPassword(''); } }}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Alterar Senha — {passwordUser?.name}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Alterar Senha — {passwordUser?.name}</DialogTitle><DialogDescription>Defina uma nova senha para o usuário</DialogDescription></DialogHeader>
           <div className="space-y-4">
             <div><Label>Nova Senha</Label><Input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="Mínimo 6 caracteres" /></div>
           </div>

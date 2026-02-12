@@ -22,12 +22,15 @@ router.post('/start-from-link', async (req: AuthRequest, res: Response) => {
       'empresas', 'estabelecimentos', 'socios',
     ];
 
+    // Normalize: remove trailing slash
+    const baseUrl = url.replace(/\/+$/, '');
+
     const jobs = [];
     for (const fileType of fileTypes) {
       const result = await pool.query(
         `INSERT INTO ingestion_jobs (source, url, file_type, status)
          VALUES ('link', $1, $2, 'pending') RETURNING *`,
-        [`${url}/${fileType}`, fileType]
+        [baseUrl, fileType]
       );
       jobs.push(result.rows[0]);
     }

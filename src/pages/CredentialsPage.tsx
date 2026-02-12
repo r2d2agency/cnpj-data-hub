@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose,
+  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose,
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -73,7 +73,7 @@ export default function CredentialsPage() {
             <Button><Plus className="h-4 w-4 mr-2" />Nova Credencial</Button>
           </DialogTrigger>
           <DialogContent>
-            <DialogHeader><DialogTitle>Nova Credencial API</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>Nova Credencial API</DialogTitle><DialogDescription>Configure uma nova chave de acesso à API</DialogDescription></DialogHeader>
             <div className="space-y-4">
               <div><Label>Nome do Sistema</Label><Input value={formSystemName} onChange={e => setFormSystemName(e.target.value)} placeholder="Ex: ERP Principal" /></div>
               <div>
