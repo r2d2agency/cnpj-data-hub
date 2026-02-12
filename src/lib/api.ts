@@ -113,6 +113,11 @@ export function startIngestion(url: string, month: string) {
   return request<any>('/ingestion/start-from-link', { method: 'POST', body: JSON.stringify({ url, month }) });
 }
 
+export function clearIngestionJobs(status?: string) {
+  const qs = status ? `?status=${status}` : '';
+  return request<any>(`/ingestion/jobs${qs}`, { method: 'DELETE' });
+}
+
 // Search (admin panel - uses JWT)
 export function searchEmpresas(params: Record<string, string>) {
   const qs = new URLSearchParams(params).toString();
