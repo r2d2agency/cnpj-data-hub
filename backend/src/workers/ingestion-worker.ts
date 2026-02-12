@@ -11,6 +11,20 @@ import { Readable } from 'stream';
 
 const BATCH_SIZE = 5000;
 
+// Structured logger that writes to DB
+async function log(jobId: string, level: 'debug' | 'info' | 'warn' | 'error', message: string, details?: string) {
+  const icon = { debug: '🔍', info: 'ℹ️', warn: '⚠️', error: '❌' }[level];
+  console[level === 'error' ? 'error' : 'log'](`${icon} [${jobId.slice(0, 8)}] ${message}`);
+  try {
+    await pool.query(
+      'INSERT INTO ingestion_logs (job_id, level, message, details) VALUES ($1, $2, $3, $4)',
+      [jobId, level, message, details || null]
+    );
+  } catch (e) {
+    console.error('Failed to write log:', e);
+  }
+}
+
 // Column mappings for each RF file type (CSV has no headers, uses ; delimiter)
 const FILE_CONFIGS: Record<string, {
   zipPrefix: string;
@@ -21,7 +35,7 @@ const FILE_CONFIGS: Record<string, {
 }> = {
   empresas: {
     zipPrefix: 'Empresas',
-    zipCount: 10, // Empresas0.zip to Empresas9.zip
+    zipCount: 10,
     table: 'empresas',
     columns: ['cnpj_basico', 'razao_social', 'natureza_juridica', 'qualificacao_responsavel', 'capital_social', 'porte_empresa', 'ente_federativo'],
     conflictKey: 'cnpj_basico',
@@ -50,7 +64,7 @@ const FILE_CONFIGS: Record<string, {
       'qualificacao_socio', 'data_entrada', 'pais', 'representante_legal',
       'nome_representante', 'qualificacao_representante', 'faixa_etaria',
     ],
-    conflictKey: '', // socios has no unique constraint, we truncate + insert
+    conflictKey: '',
   },
   municipios: {
     zipPrefix: 'Municipios',
@@ -128,7 +142,6 @@ async function processCSVStream(stream: Readable, config: typeof FILE_CONFIGS[st
     }));
 
     csvStream.on('data', (row: any) => {
-      // csv-parser with headers:false gives { '0': val, '1': val, ... }
       const values = config.columns.map((_, i) => {
         const val = row[String(i)] || '';
         return val.trim();
@@ -168,7 +181,6 @@ async function insertBatch(config: typeof FILE_CONFIGS[string], batch: any[][], 
   const client = await pool.connect();
   try {
     const cols = config.columns;
-    // Build parameterized multi-row INSERT
     const valuePlaceholders: string[] = [];
     const allValues: any[] = [];
     let paramIdx = 1;
@@ -177,7 +189,6 @@ async function insertBatch(config: typeof FILE_CONFIGS[string], batch: any[][], 
       const rowPlaceholders: string[] = [];
       for (let i = 0; i < cols.length; i++) {
         rowPlaceholders.push(`$${paramIdx}`);
-        // Handle capital_social as numeric
         if (cols[i] === 'capital_social') {
           const numStr = (row[i] || '0').replace(',', '.');
           allValues.push(parseFloat(numStr) || 0);
@@ -197,37 +208,44 @@ async function insertBatch(config: typeof FILE_CONFIGS[string], batch: any[][], 
         .join(', ');
       query = `INSERT INTO ${config.table} (${cols.join(', ')}) VALUES ${valuePlaceholders.join(', ')} ON CONFLICT (${config.conflictKey}) DO UPDATE SET ${updateCols}`;
     } else {
-      // For socios (no unique key), just insert
       query = `INSERT INTO ${config.table} (${cols.join(', ')}) VALUES ${valuePlaceholders.join(', ')}`;
     }
 
     await client.query(query, allValues);
 
-    // Update progress periodically
     const newTotal = currentTotal + batch.length;
     if (newTotal % (BATCH_SIZE * 5) === 0 || batch.length < BATCH_SIZE) {
       await updateJobStatus(jobId, 'processing', -1, { records_processed: newTotal });
+      await log(jobId, 'debug', `Processados ${newTotal.toLocaleString('pt-BR')} registros na tabela ${config.table}`);
     }
 
     return batch.length;
+  } catch (err: any) {
+    await log(jobId, 'error', `Erro ao inserir batch na tabela ${config.table}`, err.message?.substring(0, 500));
+    throw err;
   } finally {
     client.release();
   }
 }
 
 async function downloadAndProcessZip(zipUrl: string, config: typeof FILE_CONFIGS[string], jobId: string): Promise<number> {
-  console.log(`📥 Downloading: ${zipUrl}`);
+  await log(jobId, 'info', `Iniciando download: ${zipUrl}`);
   await updateJobStatus(jobId, 'downloading', 10);
 
   const response = await axios({
     method: 'get',
     url: zipUrl,
     responseType: 'stream',
-    timeout: 600000, // 10 min timeout for large files
+    timeout: 600000,
   });
 
+  const contentLength = response.headers['content-length'];
+  if (contentLength) {
+    await log(jobId, 'info', `Download iniciado — tamanho: ${(Number(contentLength) / 1024 / 1024).toFixed(1)} MB`);
+  }
+
   await updateJobStatus(jobId, 'extracting', 30);
-  console.log(`📦 Extracting: ${zipUrl}`);
+  await log(jobId, 'info', `Extraindo ZIP: ${zipUrl.split('/').pop()}`);
 
   const zip = response.data.pipe(unzipper.Parse({ forceStream: true }));
   let totalRecords = 0;
@@ -235,14 +253,16 @@ async function downloadAndProcessZip(zipUrl: string, config: typeof FILE_CONFIGS
   for await (const entry of zip) {
     const fileName = (entry as any).path as string;
     if (fileName.toUpperCase().endsWith('.CSV') || fileName.toUpperCase().endsWith('.ESTABELE') || !fileName.includes('.')) {
-      console.log(`📄 Processing CSV: ${fileName}`);
+      await log(jobId, 'info', `Processando CSV: ${fileName}`);
       await updateJobStatus(jobId, 'processing', 50);
       totalRecords += await processCSVStream(entry as any, config, jobId);
     } else {
+      await log(jobId, 'debug', `Ignorando arquivo: ${fileName}`);
       (entry as any).autodrain();
     }
   }
 
+  await log(jobId, 'info', `ZIP concluído: ${totalRecords.toLocaleString('pt-BR')} registros`);
   return totalRecords;
 }
 
@@ -250,15 +270,15 @@ export async function processJob(jobId: string, fileType: string, baseUrl: strin
   const config = FILE_CONFIGS[fileType];
   if (!config) {
     await updateJobStatus(jobId, 'error', 0, { error_message: `Unknown file type: ${fileType}` });
+    await log(jobId, 'error', `Tipo de arquivo desconhecido: ${fileType}`);
     return;
   }
 
   try {
-    console.log(`🚀 Starting ingestion job ${jobId} for ${fileType}`);
+    await log(jobId, 'info', `Iniciando ingestão para ${fileType}`);
 
-    // For socios (no unique constraint), truncate before re-import
     if (!config.conflictKey) {
-      console.log(`🗑️ Truncating ${config.table} before re-import...`);
+      await log(jobId, 'warn', `Truncando tabela ${config.table} antes da reimportação`);
       await pool.query(`TRUNCATE TABLE ${config.table}`);
     }
 
@@ -274,17 +294,19 @@ export async function processJob(jobId: string, fileType: string, baseUrl: strin
       try {
         const records = await downloadAndProcessZip(zipUrl, config, jobId);
         totalRecords += records;
-        console.log(`✅ ${zipName}: ${records} records`);
+        await log(jobId, 'info', `${zipName}: ${records.toLocaleString('pt-BR')} registros processados`);
       } catch (err: any) {
-        // Some numbered ZIPs may not exist (e.g., only 0-9), skip 404s
         if (err.response?.status === 404) {
-          console.log(`⏭️ ${zipName} not found, skipping`);
+          await log(jobId, 'warn', `${zipName} não encontrado (404), pulando`);
           continue;
         }
+        const errorDetail = err.response
+          ? `HTTP ${err.response.status}: ${err.response.statusText}`
+          : err.code || err.message;
+        await log(jobId, 'error', `Falha ao processar ${zipName}: ${errorDetail}`, err.stack?.substring(0, 500));
         throw err;
       }
 
-      // Update progress based on ZIP file index
       const progress = Math.round(50 + (50 * (i + 1) / config.zipCount));
       await updateJobStatus(jobId, 'processing', Math.min(progress, 99), {
         records_processed: totalRecords,
@@ -296,11 +318,10 @@ export async function processJob(jobId: string, fileType: string, baseUrl: strin
       total_records: totalRecords,
     });
 
-    console.log(`🎉 Job ${jobId} completed: ${totalRecords} records for ${fileType}`);
+    await log(jobId, 'info', `✅ Concluído: ${totalRecords.toLocaleString('pt-BR')} registros para ${fileType}`);
   } catch (error: any) {
-    console.error(`❌ Job ${jobId} failed:`, error.message);
-    await updateJobStatus(jobId, 'error', 0, {
-      error_message: error.message?.substring(0, 500),
-    });
+    const errMsg = error.message?.substring(0, 500) || 'Erro desconhecido';
+    await updateJobStatus(jobId, 'error', 0, { error_message: errMsg });
+    await log(jobId, 'error', `Job falhou: ${errMsg}`, error.stack?.substring(0, 1000));
   }
 }

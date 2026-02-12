@@ -12,6 +12,7 @@ import SearchPage from "./pages/SearchPage";
 import UsersPage from "./pages/UsersPage";
 import CredentialsPage from "./pages/CredentialsPage";
 import IngestionPage from "./pages/IngestionPage";
+import IngestionLogsPage from "./pages/IngestionLogsPage";
 import ApiDocsPage from "./pages/ApiDocsPage";
 import NotFound from "./pages/NotFound";
 
@@ -33,6 +34,7 @@ const App = () => (
                 <Route path="/users" element={<UsersPage />} />
                 <Route path="/credentials" element={<CredentialsPage />} />
                 <Route path="/ingestion" element={<IngestionPage />} />
+                <Route path="/ingestion/logs" element={<IngestionLogsPage />} />
                 <Route path="/api-docs" element={<ApiDocsPage />} />
               </Route>
             </Route>

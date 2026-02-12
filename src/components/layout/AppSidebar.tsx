@@ -5,6 +5,7 @@ import {
   Users,
   Key,
   DatabaseZap,
+  ScrollText,
   FileText,
   Settings,
   Database,
@@ -18,6 +19,7 @@ const navItems = [
   { to: '/users', icon: Users, label: 'Usuários' },
   { to: '/credentials', icon: Key, label: 'Credenciais API' },
   { to: '/ingestion', icon: DatabaseZap, label: 'Ingestão de Dados' },
+  { to: '/ingestion/logs', icon: ScrollText, label: 'Logs de Ingestão' },
   { to: '/api-docs', icon: FileText, label: 'Documentação API' },
 ];
 

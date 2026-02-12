@@ -156,6 +156,19 @@ CREATE TABLE IF NOT EXISTS ingestion_jobs (
     completed_at TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS ingestion_logs (
+    id BIGSERIAL PRIMARY KEY,
+    job_id UUID REFERENCES ingestion_jobs(id) ON DELETE CASCADE,
+    level VARCHAR(10) DEFAULT 'info' CHECK (level IN ('debug', 'info', 'warn', 'error')),
+    message TEXT NOT NULL,
+    details TEXT,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_ingestion_logs_job ON ingestion_logs(job_id);
+CREATE INDEX IF NOT EXISTS idx_ingestion_logs_level ON ingestion_logs(level);
+CREATE INDEX IF NOT EXISTS idx_ingestion_logs_created ON ingestion_logs(created_at DESC);
+
 -- Enable pg_trgm extension for fuzzy search (optional, may not be available)
 DO $$
 BEGIN

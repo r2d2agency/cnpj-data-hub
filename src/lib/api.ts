@@ -118,6 +118,21 @@ export function clearIngestionJobs(status?: string) {
   return request<any>(`/ingestion/jobs${qs}`, { method: 'DELETE' });
 }
 
+// Ingestion Logs
+export function fetchIngestionLogs(params?: { job_id?: string; level?: string; limit?: number }) {
+  const qs = new URLSearchParams();
+  if (params?.job_id) qs.set('job_id', params.job_id);
+  if (params?.level) qs.set('level', params.level);
+  if (params?.limit) qs.set('limit', String(params.limit));
+  const q = qs.toString();
+  return request<{ data: any[] }>(`/ingestion/logs${q ? `?${q}` : ''}`).then(r => r.data);
+}
+
+export function clearIngestionLogs(jobId?: string) {
+  const qs = jobId ? `?job_id=${jobId}` : '';
+  return request<any>(`/ingestion/logs${qs}`, { method: 'DELETE' });
+}
+
 // Search (admin panel - uses JWT)
 export function searchEmpresas(params: Record<string, string>) {
   const qs = new URLSearchParams(params).toString();
