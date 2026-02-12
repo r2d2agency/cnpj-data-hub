@@ -156,9 +156,13 @@ CREATE TABLE IF NOT EXISTS ingestion_jobs (
     completed_at TIMESTAMP
 );
 
--- Full-text search index on razao_social
-CREATE INDEX IF NOT EXISTS idx_empresas_razao_social_trgm 
-    ON empresas USING gin (razao_social gin_trgm_ops);
-
--- Enable pg_trgm extension for fuzzy search
-CREATE EXTENSION IF NOT EXISTS pg_trgm;
+-- Enable pg_trgm extension for fuzzy search (optional, may not be available)
+DO $$
+BEGIN
+  CREATE EXTENSION IF NOT EXISTS pg_trgm;
+  CREATE INDEX IF NOT EXISTS idx_empresas_razao_social_trgm 
+      ON empresas USING gin (razao_social gin_trgm_ops);
+EXCEPTION WHEN OTHERS THEN
+  RAISE NOTICE 'pg_trgm not available, skipping fuzzy search index';
+END;
+$$;
