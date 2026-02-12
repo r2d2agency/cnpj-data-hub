@@ -35,9 +35,6 @@ COPY backend/src/db/schema.sql ./backend/dist/db/
 # Copy frontend build
 COPY --from=frontend-build /app/frontend/dist ./frontend/dist
 
-# Simple server to serve frontend + proxy API
-RUN npm install -g serve
-
 EXPOSE 3001
 
 # Start script
