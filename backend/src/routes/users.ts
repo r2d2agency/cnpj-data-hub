@@ -50,6 +50,24 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
   res.json(result.rows[0]);
 });
 
+// PUT /api/v1/users/:id/password
+router.put('/:id/password', async (req: AuthRequest, res: Response) => {
+  const { password } = req.body;
+  if (!password || password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
+
+  try {
+    const hash = await bcrypt.hash(password, 12);
+    const result = await pool.query(
+      'UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2 RETURNING id',
+      [hash, req.params.id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'User not found' });
+    res.json({ message: 'Password updated' });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to update password' });
+  }
+});
+
 // DELETE /api/v1/users/:id
 router.delete('/:id', async (req: AuthRequest, res: Response) => {
   const result = await pool.query('DELETE FROM users WHERE id = $1 RETURNING id', [req.params.id]);

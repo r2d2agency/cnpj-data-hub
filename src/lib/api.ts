@@ -74,6 +74,47 @@ export function updateUser(id: string, data: { name?: string; email?: string; ro
   return request<any>(`/users/${id}`, { method: 'PUT', body: JSON.stringify(data) });
 }
 
+export function changeUserPassword(id: string, password: string) {
+  return request<any>(`/users/${id}/password`, { method: 'PUT', body: JSON.stringify({ password }) });
+}
+
 export function deleteUser(id: string) {
   return request<any>(`/users/${id}`, { method: 'DELETE' });
+}
+
+// Dashboard
+export function fetchDashboardStats() {
+  return request<any>('/ingestion/stats');
+}
+
+// Credentials
+export function fetchCredentials() {
+  return request<{ data: any[] }>('/credentials').then(r => r.data);
+}
+
+export function createCredential(data: { user_id: string; system_name: string; permissions: string[]; rate_limit: number }) {
+  return request<any>('/credentials', { method: 'POST', body: JSON.stringify(data) });
+}
+
+export function revokeCredential(id: string) {
+  return request<any>(`/credentials/${id}/revoke`, { method: 'PUT' });
+}
+
+export function regenerateCredential(id: string) {
+  return request<any>(`/credentials/${id}/regenerate`, { method: 'PUT' });
+}
+
+// Ingestion
+export function fetchIngestionJobs() {
+  return request<{ data: any[] }>('/ingestion/jobs').then(r => r.data);
+}
+
+export function startIngestion(url: string, month: string) {
+  return request<any>('/ingestion/start-from-link', { method: 'POST', body: JSON.stringify({ url, month }) });
+}
+
+// Search (admin panel - uses JWT)
+export function searchEmpresas(params: Record<string, string>) {
+  const qs = new URLSearchParams(params).toString();
+  return request<any>(`/search/admin?${qs}`);
 }

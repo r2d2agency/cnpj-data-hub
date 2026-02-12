@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Pencil, Trash2, Loader2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, Loader2, KeyRound } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { fetchUsers, createUser, updateUser, deleteUser } from '@/lib/api';
+import { fetchUsers, createUser, updateUser, deleteUser, changeUserPassword } from '@/lib/api';
 import { toast } from '@/hooks/use-toast';
 
 interface UserRow {
@@ -30,8 +30,9 @@ export default function UsersPage() {
   const queryClient = useQueryClient();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editUser, setEditUser] = useState<UserRow | null>(null);
+  const [passwordUser, setPasswordUser] = useState<UserRow | null>(null);
+  const [newPassword, setNewPassword] = useState('');
 
-  // Form state
   const [formName, setFormName] = useState('');
   const [formEmail, setFormEmail] = useState('');
   const [formPassword, setFormPassword] = useState('');
@@ -43,31 +44,25 @@ export default function UsersPage() {
 
   const createMutation = useMutation({
     mutationFn: createUser,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['users'] });
-      setIsCreateOpen(false);
-      resetForm();
-      toast({ title: 'Usuário criado com sucesso' });
-    },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['users'] }); setIsCreateOpen(false); resetForm(); toast({ title: 'Usuário criado com sucesso' }); },
     onError: (err: Error) => toast({ title: 'Erro', description: err.message, variant: 'destructive' }),
   });
 
   const updateMutation = useMutation({
     mutationFn: ({ id, ...data }: { id: string } & Record<string, any>) => updateUser(id, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['users'] });
-      setEditUser(null);
-      toast({ title: 'Usuário atualizado' });
-    },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['users'] }); setEditUser(null); toast({ title: 'Usuário atualizado' }); },
     onError: (err: Error) => toast({ title: 'Erro', description: err.message, variant: 'destructive' }),
   });
 
   const deleteMutation = useMutation({
     mutationFn: deleteUser,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['users'] });
-      toast({ title: 'Usuário removido' });
-    },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['users'] }); toast({ title: 'Usuário removido' }); },
+    onError: (err: Error) => toast({ title: 'Erro', description: err.message, variant: 'destructive' }),
+  });
+
+  const passwordMutation = useMutation({
+    mutationFn: ({ id, password }: { id: string; password: string }) => changeUserPassword(id, password),
+    onSuccess: () => { setPasswordUser(null); setNewPassword(''); toast({ title: 'Senha alterada com sucesso' }); },
     onError: (err: Error) => toast({ title: 'Erro', description: err.message, variant: 'destructive' }),
   });
 
@@ -76,12 +71,7 @@ export default function UsersPage() {
   };
 
   const openEdit = (u: UserRow) => {
-    setEditUser(u);
-    setFormName(u.name);
-    setFormEmail(u.email);
-    setFormRole(u.role);
-    setFormMaxQueries(u.max_concurrent_queries);
-    setFormStatus(u.status);
+    setEditUser(u); setFormName(u.name); setFormEmail(u.email); setFormRole(u.role); setFormMaxQueries(u.max_concurrent_queries); setFormStatus(u.status);
   };
 
   const handleCreate = () => {
@@ -101,12 +91,8 @@ export default function UsersPage() {
           <h1 className="text-2xl font-bold text-foreground">Usuários</h1>
           <p className="text-sm text-muted-foreground mt-1">Gerencie os usuários e permissões de acesso</p>
         </div>
-
-        {/* Create Dialog */}
         <Dialog open={isCreateOpen} onOpenChange={(open) => { setIsCreateOpen(open); if (!open) resetForm(); }}>
-          <DialogTrigger asChild>
-            <Button><Plus className="h-4 w-4 mr-2" />Novo Usuário</Button>
-          </DialogTrigger>
+          <DialogTrigger asChild><Button><Plus className="h-4 w-4 mr-2" />Novo Usuário</Button></DialogTrigger>
           <DialogContent>
             <DialogHeader><DialogTitle>Novo Usuário</DialogTitle></DialogHeader>
             <div className="space-y-4">
@@ -175,23 +161,31 @@ export default function UsersPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Password Dialog */}
+      <Dialog open={!!passwordUser} onOpenChange={(open) => { if (!open) { setPasswordUser(null); setNewPassword(''); } }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Alterar Senha — {passwordUser?.name}</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <div><Label>Nova Senha</Label><Input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="Mínimo 6 caracteres" /></div>
+          </div>
+          <DialogFooter>
+            <DialogClose asChild><Button variant="outline">Cancelar</Button></DialogClose>
+            <Button onClick={() => passwordUser && passwordMutation.mutate({ id: passwordUser.id, password: newPassword })} disabled={passwordMutation.isPending || newPassword.length < 6}>
+              {passwordMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Alterar Senha
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Table */}
       <div className="rounded-lg border bg-card overflow-hidden">
         {isLoading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-          </div>
+          <div className="flex items-center justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
         ) : (
           <table className="data-table">
             <thead>
               <tr>
-                <th>Nome</th>
-                <th>Email</th>
-                <th>Perfil</th>
-                <th>Status</th>
-                <th>Máx. Consultas</th>
-                <th>Criado em</th>
-                <th className="w-20">Ações</th>
+                <th>Nome</th><th>Email</th><th>Perfil</th><th>Status</th><th>Máx. Consultas</th><th>Criado em</th><th className="w-28">Ações</th>
               </tr>
             </thead>
             <tbody>
@@ -199,41 +193,30 @@ export default function UsersPage() {
                 <tr key={user.id}>
                   <td className="font-medium">{user.name}</td>
                   <td className="text-muted-foreground font-mono text-xs">{user.email}</td>
-                  <td>
-                    <Badge variant={user.role === 'admin' ? 'default' : 'secondary'} className="text-[10px]">
-                      {user.role}
-                    </Badge>
-                  </td>
-                  <td>
-                    <span className={`badge-status ${user.status === 'active' ? 'badge-active' : 'badge-inactive'}`}>
-                      {user.status === 'active' ? 'Ativo' : 'Inativo'}
-                    </span>
-                  </td>
+                  <td><Badge variant={user.role === 'admin' ? 'default' : 'secondary'} className="text-[10px]">{user.role}</Badge></td>
+                  <td><span className={`badge-status ${user.status === 'active' ? 'badge-active' : 'badge-inactive'}`}>{user.status === 'active' ? 'Ativo' : 'Inativo'}</span></td>
                   <td className="font-mono">{user.max_concurrent_queries}</td>
                   <td className="text-muted-foreground text-xs">{new Date(user.created_at).toLocaleDateString('pt-BR')}</td>
                   <td>
                     <div className="flex items-center gap-1">
-                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(user)}>
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(user)} title="Editar">
                         <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setPasswordUser(user)} title="Alterar senha">
+                        <KeyRound className="h-3.5 w-3.5" />
                       </Button>
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive">
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive"><Trash2 className="h-3.5 w-3.5" /></Button>
                         </AlertDialogTrigger>
                         <AlertDialogContent>
                           <AlertDialogHeader>
                             <AlertDialogTitle>Excluir usuário?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Essa ação não pode ser desfeita. O usuário <strong>{user.name}</strong> será removido permanentemente.
-                            </AlertDialogDescription>
+                            <AlertDialogDescription>O usuário <strong>{user.name}</strong> será removido permanentemente.</AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>
                             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => deleteMutation.mutate(user.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                              Excluir
-                            </AlertDialogAction>
+                            <AlertDialogAction onClick={() => deleteMutation.mutate(user.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Excluir</AlertDialogAction>
                           </AlertDialogFooter>
                         </AlertDialogContent>
                       </AlertDialog>
