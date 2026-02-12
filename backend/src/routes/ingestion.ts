@@ -93,4 +93,54 @@ router.get('/stats', async (_req: AuthRequest, res: Response) => {
   res.json(stats.rows[0]);
 });
 
+// GET /api/v1/ingestion/logs — all logs or filtered by job_id / level
+router.get('/logs', async (req: AuthRequest, res: Response) => {
+  const { job_id, level, limit: lim } = req.query;
+  const conditions: string[] = [];
+  const values: any[] = [];
+  let idx = 1;
+
+  if (job_id) {
+    conditions.push(`l.job_id = $${idx}`);
+    values.push(job_id);
+    idx++;
+  }
+  if (level) {
+    conditions.push(`l.level = $${idx}`);
+    values.push(level);
+    idx++;
+  }
+
+  const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+  const limitVal = Math.min(Number(lim) || 200, 1000);
+
+  const result = await pool.query(
+    `SELECT l.*, j.file_type, j.status as job_status
+     FROM ingestion_logs l
+     LEFT JOIN ingestion_jobs j ON j.id = l.job_id
+     ${where}
+     ORDER BY l.created_at DESC
+     LIMIT ${limitVal}`,
+    values
+  );
+  res.json({ data: result.rows });
+});
+
+// DELETE /api/v1/ingestion/logs — clear logs
+router.delete('/logs', async (req: AuthRequest, res: Response) => {
+  const { job_id } = req.query;
+  try {
+    let result;
+    if (job_id) {
+      result = await pool.query('DELETE FROM ingestion_logs WHERE job_id = $1', [job_id]);
+    } else {
+      result = await pool.query('DELETE FROM ingestion_logs');
+    }
+    res.json({ message: `${result.rowCount} log(s) removido(s)` });
+  } catch (error) {
+    console.error('Delete logs error:', error);
+    res.status(500).json({ error: 'Failed to delete logs' });
+  }
+});
+
 export default router;
