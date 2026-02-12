@@ -7,7 +7,7 @@ const router = Router();
 // GET /api/v1/cnpj/:cnpj - Consulta por CNPJ completo
 router.get('/cnpj/:cnpj', apiKeyAuth, async (req: AuthRequest, res: Response) => {
   const start = Date.now();
-  const cnpj = req.params.cnpj.replace(/\D/g, '');
+  const cnpj = (req.params.cnpj as string).replace(/\D/g, '');
 
   if (cnpj.length !== 14) {
     return res.status(400).json({ error: 'CNPJ must have 14 digits' });
