@@ -1,7 +1,6 @@
 version: '3.8'
 
 services:
-  # PostgreSQL Database
   postgres:
     image: postgres:16-alpine
     container_name: cnpj-postgres
@@ -20,7 +19,6 @@ services:
       timeout: 5s
       retries: 5
 
-  # Application (Frontend + Backend)
   app:
     build:
       context: .
@@ -28,8 +26,7 @@ services:
     container_name: cnpj-app
     restart: unless-stopped
     ports:
-      - "3000:3000"  # Frontend
-      - "3001:3001"  # API
+      - "3001:3001"
     environment:
       DATABASE_URL: postgresql://cnpj_user:cnpj_password@postgres:5432/cnpj_data
       JWT_SECRET: ${JWT_SECRET:-change_this_in_production}
