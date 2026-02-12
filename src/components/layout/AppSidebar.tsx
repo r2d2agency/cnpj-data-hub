@@ -1,4 +1,4 @@
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
   Search,
@@ -8,7 +8,9 @@ import {
   FileText,
   Settings,
   Database,
+  LogOut,
 } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 
 const navItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
@@ -21,6 +23,13 @@ const navItems = [
 
 export default function AppSidebar() {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
 
   return (
     <aside className="fixed left-0 top-0 z-40 flex h-screen w-64 flex-col border-r border-sidebar-border bg-sidebar">
@@ -56,21 +65,16 @@ export default function AppSidebar() {
 
       {/* Footer */}
       <div className="border-t border-sidebar-border p-3">
-        <Link to="/settings" className="sidebar-item">
-          <Settings className="h-4 w-4 shrink-0" />
-          <span>Configurações</span>
-        </Link>
-        <div className="mt-3 rounded-md bg-sidebar-accent px-3 py-2">
-          <p className="text-[10px] font-medium text-sidebar-foreground/50 uppercase tracking-wider">
-            Base de dados
-          </p>
-          <p className="mt-0.5 text-xs font-semibold text-sidebar-primary font-mono">
-            54.283.491 registros
-          </p>
-          <p className="text-[10px] text-sidebar-foreground/40">
-            Atualizado: Jan/2026
-          </p>
-        </div>
+        {user && (
+          <div className="mb-3 rounded-md bg-sidebar-accent px-3 py-2">
+            <p className="text-xs font-semibold text-sidebar-foreground truncate">{user.name}</p>
+            <p className="text-[10px] text-sidebar-foreground/50 truncate">{user.email}</p>
+          </div>
+        )}
+        <button onClick={handleLogout} className="sidebar-item w-full text-destructive/80 hover:text-destructive">
+          <LogOut className="h-4 w-4 shrink-0" />
+          <span>Sair</span>
+        </button>
       </div>
     </aside>
   );
