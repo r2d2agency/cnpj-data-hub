@@ -60,6 +60,23 @@ router.get('/jobs', async (_req: AuthRequest, res: Response) => {
   res.json({ data: result.rows });
 });
 
+// DELETE /api/v1/ingestion/jobs — clear all or by status
+router.delete('/jobs', async (req: AuthRequest, res: Response) => {
+  const { status } = req.query;
+  try {
+    let result;
+    if (status) {
+      result = await pool.query('DELETE FROM ingestion_jobs WHERE status = $1', [status]);
+    } else {
+      result = await pool.query('DELETE FROM ingestion_jobs');
+    }
+    res.json({ message: `${result.rowCount} job(s) removido(s)` });
+  } catch (error) {
+    console.error('Delete jobs error:', error);
+    res.status(500).json({ error: 'Failed to delete jobs' });
+  }
+});
+
 // GET /api/v1/ingestion/stats
 router.get('/stats', async (_req: AuthRequest, res: Response) => {
   const stats = await pool.query(`
