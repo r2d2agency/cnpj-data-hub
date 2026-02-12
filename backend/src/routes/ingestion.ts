@@ -1,4 +1,4 @@
-import { Router, Response } from 'express';
+import { Router, Request, Response } from 'express';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
@@ -15,13 +15,13 @@ const uploadDir = path.join('/tmp', 'ingestion-uploads');
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 
 const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, uploadDir),
-  filename: (_req, file, cb) => cb(null, `${Date.now()}-${file.originalname}`),
+  destination: (_req: Request, _file: Express.Multer.File, cb: (error: Error | null, destination: string) => void) => cb(null, uploadDir),
+  filename: (_req: Request, file: Express.Multer.File, cb: (error: Error | null, filename: string) => void) => cb(null, `${Date.now()}-${file.originalname}`),
 });
 
 const upload = multer({
   storage,
-  fileFilter: (_req, file, cb) => {
+  fileFilter: (_req: Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
     if (file.originalname.toLowerCase().endsWith('.zip')) {
       cb(null, true);
     } else {
@@ -32,7 +32,7 @@ const upload = multer({
 });
 
 // POST /api/v1/ingestion/upload — manual ZIP upload
-router.post('/upload', upload.single('file'), async (req: AuthRequest, res: Response) => {
+router.post('/upload', upload.single('file'), async (req: Request, res: Response) => {
   const file = req.file;
   const { file_type } = req.body;
 
@@ -42,7 +42,6 @@ router.post('/upload', upload.single('file'), async (req: AuthRequest, res: Resp
 
   const validTypes = ['municipios', 'paises', 'naturezas', 'qualificacoes', 'cnaes', 'empresas', 'estabelecimentos', 'socios'];
   if (!file_type || !validTypes.includes(file_type)) {
-    // Clean up uploaded file
     fs.unlink(file.path, () => {});
     return res.status(400).json({ error: `Tipo inválido. Valores aceitos: ${validTypes.join(', ')}` });
   }
@@ -55,14 +54,12 @@ router.post('/upload', upload.single('file'), async (req: AuthRequest, res: Resp
     );
     const job = result.rows[0];
 
-    // Process in background
     (async () => {
       try {
         await processUploadedZip(job.id, file_type, file.path);
       } catch (err) {
         console.error(`Upload job ${job.id} failed:`, err);
       } finally {
-        // Clean up file after processing
         fs.unlink(file.path, () => {});
       }
     })();
@@ -89,7 +86,6 @@ router.post('/start-from-link', async (req: AuthRequest, res: Response) => {
       'empresas', 'estabelecimentos', 'socios',
     ];
 
-    // Check which file types already have completed jobs (skip them)
     let typesToProcess = fileTypes;
     if (skip_completed !== false) {
       const completed = await pool.query(
@@ -146,7 +142,7 @@ router.get('/jobs', async (_req: AuthRequest, res: Response) => {
   res.json({ data: result.rows });
 });
 
-// DELETE /api/v1/ingestion/jobs — clear all or by status
+// DELETE /api/v1/ingestion/jobs
 router.delete('/jobs', async (req: AuthRequest, res: Response) => {
   const { status } = req.query;
   try {
