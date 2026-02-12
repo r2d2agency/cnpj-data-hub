@@ -14,7 +14,7 @@ RUN npm run build
 FROM node:20-alpine AS backend-build
 WORKDIR /app/backend
 COPY backend/package*.json ./
-RUN npm install && npm install multer @types/multer
+RUN npm install
 COPY backend/ .
 RUN npx tsc
 
