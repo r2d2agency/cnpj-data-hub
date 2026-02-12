@@ -29,7 +29,15 @@ export default function IngestionPage() {
   const [linkUrl, setLinkUrl] = useState('');
   const [selectedMonth, setSelectedMonth] = useState('2026-01');
 
-  const { data: jobs = [], isLoading } = useQuery({ queryKey: ['ingestion-jobs'], queryFn: fetchIngestionJobs });
+  const { data: jobs = [], isLoading } = useQuery({
+    queryKey: ['ingestion-jobs'],
+    queryFn: fetchIngestionJobs,
+    refetchInterval: (query) => {
+      const data = query.state.data as any[] | undefined;
+      const hasActive = data?.some((j: any) => !['completed', 'error'].includes(j.status));
+      return hasActive ? 5000 : false;
+    },
+  });
 
   const startMut = useMutation({
     mutationFn: () => startIngestion(linkUrl, selectedMonth),
