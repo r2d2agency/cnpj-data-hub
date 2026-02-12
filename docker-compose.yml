@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: cnpj-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: cnpj_data
+      POSTGRES_USER: cnpj_user
+      POSTGRES_PASSWORD: cnpj_password
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cnpj_user -d cnpj_data"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Application (Frontend + Backend)
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cnpj-app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"  # Frontend
+      - "3001:3001"  # API
+    environment:
+      DATABASE_URL: postgresql://cnpj_user:cnpj_password@postgres:5432/cnpj_data
+      JWT_SECRET: ${JWT_SECRET:-change_this_in_production}
+      NODE_ENV: production
+      PORT: 3001
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  pgdata:
