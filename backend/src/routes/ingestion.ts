@@ -99,7 +99,22 @@ router.post('/start-from-link', async (req: AuthRequest, res: Response) => {
       }
     }
 
-    const baseUrl = url.replace(/\/+$/, '');
+    // Transform share URL to WebDAV download URL
+    // Input:  https://arquivos.receitafederal.gov.br/index.php/s/YggdBLfdninEJX9
+    // Output: https://arquivos.receitafederal.gov.br/public.php/dav/files/YggdBLfdninEJX9/2026-01
+    const shareMatch = url.match(/\/index\.php\/s\/([A-Za-z0-9]+)/);
+    let baseUrl: string;
+    if (shareMatch) {
+      const shareId = shareMatch[1];
+      const origin = new URL(url).origin;
+      const monthPath = month || '';
+      baseUrl = monthPath
+        ? `${origin}/public.php/dav/files/${shareId}/${monthPath}`
+        : `${origin}/public.php/dav/files/${shareId}`;
+    } else {
+      // If already a direct URL, use as-is
+      baseUrl = url.replace(/\/+$/, '');
+    }
     const skipped = fileTypes.filter(ft => !typesToProcess.includes(ft));
 
     const jobs = [];
