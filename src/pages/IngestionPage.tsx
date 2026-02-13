@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { Upload, Link2, Play, CheckCircle2, AlertCircle, Clock, Loader2, RefreshCw, Download, Trash2, ChevronDown, ChevronUp, FileArchive } from 'lucide-react';
+import { Upload, Link2, Play, CheckCircle2, AlertCircle, Clock, Loader2, RefreshCw, Download, Trash2, ChevronDown, ChevronUp, FileArchive, ScrollText } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { fetchIngestionJobs, startIngestion, clearIngestionJobs, uploadIngestionZip } from '@/lib/api';
+import { fetchIngestionJobs, startIngestion, clearIngestionJobs, uploadIngestionZip, fetchIngestionLogs } from '@/lib/api';
 import { toast } from '@/hooks/use-toast';
 
 const statusIcons: Record<string, React.ReactNode> = {
@@ -53,8 +53,18 @@ export default function IngestionPage() {
     refetchInterval: (query) => {
       const data = query.state.data as any[] | undefined;
       const hasActive = data?.some((j: any) => !['completed', 'error'].includes(j.status));
-      return hasActive ? 5000 : false;
+      return hasActive ? 3000 : false;
     },
+  });
+
+  // Find active job for live logs
+  const activeJob = jobs.find((j: any) => !['completed', 'error'].includes(j.status));
+
+  const { data: liveLogs = [] } = useQuery({
+    queryKey: ['live-logs', activeJob?.id],
+    queryFn: () => fetchIngestionLogs({ job_id: activeJob?.id, limit: 30 }),
+    enabled: !!activeJob,
+    refetchInterval: activeJob ? 3000 : false,
   });
 
   const startMut = useMutation({
@@ -219,6 +229,47 @@ export default function IngestionPage() {
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* Live Logs Panel */}
+      {activeJob && (
+        <div className="rounded-lg border bg-card p-5">
+          <div className="flex items-center gap-2 mb-3">
+            <Loader2 className="h-4 w-4 animate-spin text-primary" />
+            <h2 className="text-base font-semibold text-foreground">Processamento em Andamento</h2>
+            <Badge variant="outline" className="text-[10px]">{activeJob.file_type}</Badge>
+            <span className="text-xs font-mono text-muted-foreground ml-auto">
+              {Number(activeJob.records_processed || 0).toLocaleString('pt-BR')} registros • {activeJob.progress}%
+            </span>
+          </div>
+          <Progress value={activeJob.progress} className="h-2 mb-3" />
+          <div className="bg-muted/50 rounded border max-h-48 overflow-y-auto p-2 space-y-0.5 font-mono text-[11px]">
+            {liveLogs.length === 0 ? (
+              <p className="text-muted-foreground text-center py-4">Aguardando logs...</p>
+            ) : (
+              liveLogs.map((log: any, i: number) => {
+                const levelColors: Record<string, string> = {
+                  error: 'text-destructive',
+                  warn: 'text-yellow-600',
+                  info: 'text-foreground',
+                  debug: 'text-muted-foreground',
+                };
+                const levelIcons: Record<string, string> = {
+                  error: '❌', warn: '⚠️', info: 'ℹ️', debug: '🔍',
+                };
+                return (
+                  <div key={log.id || i} className={`flex gap-2 ${levelColors[log.level] || 'text-foreground'}`}>
+                    <span className="shrink-0">{levelIcons[log.level] || '•'}</span>
+                    <span className="text-muted-foreground shrink-0">
+                      {new Date(log.created_at).toLocaleTimeString('pt-BR')}
+                    </span>
+                    <span className="break-all">{log.message}</span>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Job history */}
       <div className="rounded-lg border bg-card p-5">
