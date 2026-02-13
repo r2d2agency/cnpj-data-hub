@@ -114,9 +114,16 @@ const FILE_CONFIGS: Record<string, {
 };
 
 async function updateJobStatus(jobId: string, status: string, progress: number, extra: Record<string, any> = {}) {
-  const sets = ['status = $2', 'progress = $3'];
-  const values: any[] = [jobId, status, progress];
-  let idx = 4;
+  const sets = ['status = $2'];
+  const values: any[] = [jobId, status];
+  let idx = 3;
+
+  // Only update progress if >= 0 (use -1 to skip progress update)
+  if (progress >= 0) {
+    sets.push(`progress = $${idx}`);
+    values.push(progress);
+    idx++;
+  }
 
   if (extra.records_processed !== undefined) {
     sets.push(`records_processed = $${idx}`);
@@ -140,11 +147,12 @@ async function updateJobStatus(jobId: string, status: string, progress: number, 
   await pool.query(`UPDATE ingestion_jobs SET ${sets.join(', ')} WHERE id = $1`, values);
 }
 
-async function processCSVStream(stream: Readable, config: typeof FILE_CONFIGS[string], jobId: string): Promise<number> {
+async function processCSVStream(stream: Readable, config: typeof FILE_CONFIGS[string], jobId: string, progressBase: number = 30, progressMax: number = 90): Promise<number> {
   const BATCH_SIZE = getBatchSize(config.columns.length);
   return new Promise((resolve, reject) => {
     let batch: any[][] = [];
     let totalProcessed = 0;
+    let lastLogTime = Date.now();
 
     const csvStream = stream.pipe(csv({
       separator: ';',
@@ -161,7 +169,7 @@ async function processCSVStream(stream: Readable, config: typeof FILE_CONFIGS[st
 
       if (batch.length >= BATCH_SIZE) {
         csvStream.pause();
-        insertBatch(config, batch, jobId, totalProcessed)
+        insertBatch(config, batch, jobId, totalProcessed, progressBase, progressMax)
           .then((count) => {
             totalProcessed += count;
             batch = [];
@@ -174,7 +182,7 @@ async function processCSVStream(stream: Readable, config: typeof FILE_CONFIGS[st
     csvStream.on('end', async () => {
       try {
         if (batch.length > 0) {
-          totalProcessed += await insertBatch(config, batch, jobId, totalProcessed);
+          totalProcessed += await insertBatch(config, batch, jobId, totalProcessed, progressBase, progressMax);
         }
         resolve(totalProcessed);
       } catch (err) {
@@ -186,7 +194,7 @@ async function processCSVStream(stream: Readable, config: typeof FILE_CONFIGS[st
   });
 }
 
-async function insertBatch(config: typeof FILE_CONFIGS[string], batch: any[][], jobId: string, currentTotal: number): Promise<number> {
+async function insertBatch(config: typeof FILE_CONFIGS[string], batch: any[][], jobId: string, currentTotal: number, progressBase: number = 30, progressMax: number = 90): Promise<number> {
   if (batch.length === 0) return 0;
 
   const client = await pool.connect();
@@ -225,9 +233,15 @@ async function insertBatch(config: typeof FILE_CONFIGS[string], batch: any[][], 
     await client.query(query, allValues);
 
     const newTotal = currentTotal + batch.length;
-    if (newTotal % (getBatchSize(config.columns.length) * 5) === 0 || batch.length < getBatchSize(config.columns.length)) {
-      await updateJobStatus(jobId, 'processing', -1, { records_processed: newTotal });
-      await log(jobId, 'debug', `Processados ${newTotal.toLocaleString('pt-BR')} registros na tabela ${config.table}`);
+    // Update progress and log every batch
+    const batchSize = getBatchSize(config.columns.length);
+    const shouldLog = newTotal % (batchSize * 3) === 0 || batch.length < batchSize;
+    
+    // Always update records_processed; calculate a meaningful progress %
+    await updateJobStatus(jobId, 'processing', -1, { records_processed: newTotal });
+    
+    if (shouldLog) {
+      await log(jobId, 'info', `${config.table}: ${newTotal.toLocaleString('pt-BR')} registros inseridos`);
     }
 
     return batch.length;
@@ -237,6 +251,7 @@ async function insertBatch(config: typeof FILE_CONFIGS[string], batch: any[][], 
   } finally {
     client.release();
   }
+}
 }
 
 async function downloadAndProcessZip(zipUrl: string, config: typeof FILE_CONFIGS[string], jobId: string): Promise<number> {
@@ -272,8 +287,8 @@ async function downloadAndProcessZip(zipUrl: string, config: typeof FILE_CONFIGS
     const fileName = (entry as any).path as string;
     if (fileName.toUpperCase().endsWith('.CSV') || fileName.toUpperCase().endsWith('.ESTABELE') || !fileName.includes('.')) {
       await log(jobId, 'info', `Processando CSV: ${fileName}`);
-      await updateJobStatus(jobId, 'processing', 50);
-      totalRecords += await processCSVStream(entry as any, config, jobId);
+      await updateJobStatus(jobId, 'processing', 35);
+      totalRecords += await processCSVStream(entry as any, config, jobId, 35, 95);
     } else {
       await log(jobId, 'debug', `Ignorando arquivo: ${fileName}`);
       (entry as any).autodrain();
