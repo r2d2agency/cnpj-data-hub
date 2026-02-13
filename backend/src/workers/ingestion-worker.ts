@@ -11,6 +11,10 @@ import { Readable } from 'stream';
 // =============================================
 
 const MAX_PARAMS = 60000; // PostgreSQL limit is 65535
+
+function cleanNullBytes(val: string): string {
+  return val.replace(/\x00/g, '');
+}
 const DEFAULT_BATCH_SIZE = 5000;
 
 function getBatchSize(columnCount: number): number {
@@ -151,7 +155,7 @@ async function processCSVStream(stream: Readable, config: typeof FILE_CONFIGS[st
     csvStream.on('data', (row: any) => {
       const values = config.columns.map((_, i) => {
         const val = row[String(i)] || '';
-        return val.trim();
+        return cleanNullBytes(val.trim());
       });
       batch.push(values);
 
