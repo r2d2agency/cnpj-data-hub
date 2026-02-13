@@ -284,7 +284,7 @@ async function downloadAndProcessZip(zipUrl: string, config: typeof FILE_CONFIGS
 
   for await (const entry of zip) {
     const fileName = (entry as any).path as string;
-    if (fileName.toUpperCase().endsWith('.CSV') || fileName.toUpperCase().endsWith('.ESTABELE') || !fileName.includes('.')) {
+    if (fileName.toUpperCase().endsWith('.CSV') || fileName.toUpperCase().includes('CSV') || fileName.toUpperCase().endsWith('.ESTABELE') || !fileName.includes('.')) {
       await log(jobId, 'info', `Processando CSV: ${fileName}`);
       await updateJobStatus(jobId, 'processing', 35);
       totalRecords += await processCSVStream(entry as any, config, jobId, 35, 95);
@@ -386,7 +386,7 @@ export async function processUploadedZip(jobId: string, fileType: string, filePa
 
     for await (const entry of zip) {
       const fileName = (entry as any).path as string;
-      if (fileName.toUpperCase().endsWith('.CSV') || fileName.toUpperCase().endsWith('.ESTABELE') || !fileName.includes('.')) {
+      if (fileName.toUpperCase().endsWith('.CSV') || fileName.toUpperCase().includes('CSV') || fileName.toUpperCase().endsWith('.ESTABELE') || !fileName.includes('.')) {
         await log(jobId, 'info', `Processando CSV: ${fileName}`);
         await updateJobStatus(jobId, 'processing', 50);
         totalRecords += await processCSVStream(entry as any, config, jobId);
