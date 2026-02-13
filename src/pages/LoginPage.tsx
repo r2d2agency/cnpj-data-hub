@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Database, LogIn } from 'lucide-react';
+import { useNavigate, Link } from 'react-router-dom';
+import { Database, LogIn, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -81,6 +81,15 @@ export default function LoginPage() {
             {loading ? 'Entrando...' : 'Entrar'}
           </Button>
         </form>
+
+        {/* Footer */}
+        <div className="flex items-center justify-between text-xs text-muted-foreground px-1">
+          <span className="font-medium">R2D2 - TNS</span>
+          <Link to="/api-docs" className="flex items-center gap-1 hover:text-foreground transition-colors">
+            <FileText className="h-3 w-3" />
+            Documentação API
+          </Link>
+        </div>
       </div>
     </div>
   );
