@@ -46,6 +46,7 @@ export default function IngestionPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadFileType, setUploadFileType] = useState('empresas');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
 
   const { data: jobs = [], isLoading } = useQuery({
     queryKey: ['ingestion-jobs'],
@@ -83,15 +84,20 @@ export default function IngestionPage() {
   const uploadMut = useMutation({
     mutationFn: () => {
       if (!selectedFile) throw new Error('Selecione um arquivo');
-      return uploadIngestionZip(selectedFile, uploadFileType);
+      setUploadProgress(0);
+      return uploadIngestionZip(selectedFile, uploadFileType, (p) => setUploadProgress(p));
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ingestion-jobs'] });
       setSelectedFile(null);
+      setUploadProgress(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
       toast({ title: 'Upload recebido, processamento iniciado' });
     },
-    onError: (err: Error) => toast({ title: 'Erro', description: err.message, variant: 'destructive' }),
+    onError: (err: Error) => {
+      setUploadProgress(null);
+      toast({ title: 'Erro', description: err.message, variant: 'destructive' });
+    },
   });
 
   const clearMut = useMutation({
@@ -226,6 +232,16 @@ export default function IngestionPage() {
               {uploadMut.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
               Enviar e Processar
             </Button>
+
+            {uploadProgress !== null && (
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>Enviando arquivo...</span>
+                  <span className="font-mono">{uploadProgress}%</span>
+                </div>
+                <Progress value={uploadProgress} className="h-2" />
+              </div>
+            )}
           </div>
         </TabsContent>
       </Tabs>
