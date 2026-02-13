@@ -72,7 +72,17 @@ router.get('/cnpj/:cnpj', apiKeyAuth, async (req: AuthRequest, res: Response) =>
 // GET /api/v1/search - Pesquisa avançada
 router.get('/search', apiKeyAuth, async (req: AuthRequest, res: Response) => {
   const start = Date.now();
-  const { cnae, municipio, uf, razao_social, situacao, page = '1', limit = '20' } = req.query;
+  const { cnae, municipio, uf, razao_social, situacao, data_abertura_gte, data_abertura_lte, page = '1', limit = '20' } = req.query;
+
+  // Validate date range: max 1 year
+  if (data_abertura_gte && data_abertura_lte) {
+    const gte = new Date((data_abertura_gte as string).replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3'));
+    const lte = new Date((data_abertura_lte as string).replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3'));
+    const diffMs = lte.getTime() - gte.getTime();
+    const diffDays = diffMs / (1000 * 60 * 60 * 24);
+    if (diffDays < 0) return res.status(400).json({ error: 'data_abertura_gte must be before data_abertura_lte' });
+    if (diffDays > 366) return res.status(400).json({ error: 'Date range cannot exceed 1 year (366 days)' });
+  }
 
   const pageNum = Math.max(1, parseInt(page as string));
   const limitNum = Math.min(100, Math.max(1, parseInt(limit as string)));
@@ -102,6 +112,14 @@ router.get('/search', apiKeyAuth, async (req: AuthRequest, res: Response) => {
     conditions.push(`est.situacao_cadastral = $${paramIndex++}`);
     params.push(situacao);
   }
+  if (data_abertura_gte) {
+    conditions.push(`est.data_inicio_atividade >= $${paramIndex++}`);
+    params.push(data_abertura_gte);
+  }
+  if (data_abertura_lte) {
+    conditions.push(`est.data_inicio_atividade <= $${paramIndex++}`);
+    params.push(data_abertura_lte);
+  }
 
   const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
@@ -116,7 +134,7 @@ router.get('/search', apiKeyAuth, async (req: AuthRequest, res: Response) => {
     const dataQuery = `
       SELECT e.cnpj_basico, e.razao_social, e.capital_social,
              est.cnpj_ordem, est.cnpj_dv, est.nome_fantasia, est.situacao_cadastral,
-             est.cnae_principal, est.logradouro, est.numero, est.bairro, est.cep, est.uf,
+             est.cnae_principal, est.data_inicio_atividade, est.logradouro, est.numero, est.bairro, est.cep, est.uf,
              m.descricao as municipio_nome,
              n.descricao as natureza_descricao,
              c.descricao as cnae_descricao
@@ -202,7 +220,17 @@ router.get('/cnaes', apiKeyAuth, async (_req: AuthRequest, res: Response) => {
 
 // GET /api/v1/search/admin - Search for admin panel (JWT auth)
 router.get('/search/admin', jwtAuth, async (req: AuthRequest, res: Response) => {
-  const { cnae, municipio, uf, razao_social, situacao, cnpj, page = '1', limit = '20' } = req.query;
+  const { cnae, municipio, uf, razao_social, situacao, cnpj, data_abertura_gte, data_abertura_lte, page = '1', limit = '20' } = req.query;
+
+  // Validate date range: max 1 year
+  if (data_abertura_gte && data_abertura_lte) {
+    const gte = new Date((data_abertura_gte as string).replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3'));
+    const lte = new Date((data_abertura_lte as string).replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3'));
+    const diffMs = lte.getTime() - gte.getTime();
+    const diffDays = diffMs / (1000 * 60 * 60 * 24);
+    if (diffDays < 0) return res.status(400).json({ error: 'data_abertura_gte must be before data_abertura_lte' });
+    if (diffDays > 366) return res.status(400).json({ error: 'Date range cannot exceed 1 year (366 days)' });
+  }
 
   const pageNum = Math.max(1, parseInt(page as string));
   const limitNum = Math.min(100, Math.max(1, parseInt(limit as string)));
@@ -237,6 +265,14 @@ router.get('/search/admin', jwtAuth, async (req: AuthRequest, res: Response) => 
     conditions.push(`est.situacao_cadastral = $${paramIndex++}`);
     params.push(situacao);
   }
+  if (data_abertura_gte) {
+    conditions.push(`est.data_inicio_atividade >= $${paramIndex++}`);
+    params.push(data_abertura_gte);
+  }
+  if (data_abertura_lte) {
+    conditions.push(`est.data_inicio_atividade <= $${paramIndex++}`);
+    params.push(data_abertura_lte);
+  }
 
   const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
@@ -251,7 +287,7 @@ router.get('/search/admin', jwtAuth, async (req: AuthRequest, res: Response) => 
     const dataQuery = `
       SELECT e.cnpj_basico, e.razao_social, e.capital_social,
              est.cnpj_ordem, est.cnpj_dv, est.nome_fantasia, est.situacao_cadastral,
-             est.cnae_principal, est.logradouro, est.numero, est.bairro, est.cep, est.uf,
+             est.cnae_principal, est.data_inicio_atividade, est.logradouro, est.numero, est.bairro, est.cep, est.uf,
              m.descricao as municipio_nome,
              n.descricao as natureza_descricao,
              c.descricao as cnae_descricao
