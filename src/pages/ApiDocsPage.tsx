@@ -310,7 +310,9 @@ export default function ApiDocsPage() {
     <div className="p-6 space-y-6 max-w-4xl">
       <div>
         <h1 className="text-2xl font-bold text-foreground">Documentação da API</h1>
-        <p className="text-sm text-muted-foreground mt-1">Referência interativa — teste os endpoints diretamente</p>
+        <p className="text-sm text-muted-foreground mt-1">
+          Referência interativa — teste os endpoints diretamente | <a href="https://cnpj.gleego.com.br" className="text-primary hover:underline" target="_blank" rel="noopener noreferrer">cnpj.gleego.com.br</a>
+        </p>
       </div>
 
       {/* Auth Info */}
