@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
+import { SettingsProvider } from "./contexts/SettingsContext";
 import ProtectedRoute from "./components/layout/ProtectedRoute";
 import AppLayout from "./components/layout/AppLayout";
 import LoginPage from "./pages/LoginPage";
@@ -14,6 +15,7 @@ import CredentialsPage from "./pages/CredentialsPage";
 import IngestionPage from "./pages/IngestionPage";
 import IngestionLogsPage from "./pages/IngestionLogsPage";
 import ApiDocsPage from "./pages/ApiDocsPage";
+import SettingsPage from "./pages/SettingsPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -23,25 +25,28 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <AuthProvider>
-        <BrowserRouter>
-          <Routes>
-            <Route path="/login" element={<LoginPage />} />
-            <Route element={<ProtectedRoute />}>
-              <Route element={<AppLayout />}>
-                <Route path="/" element={<Dashboard />} />
-                <Route path="/search" element={<SearchPage />} />
-                <Route path="/users" element={<UsersPage />} />
-                <Route path="/credentials" element={<CredentialsPage />} />
-                <Route path="/ingestion" element={<IngestionPage />} />
-                <Route path="/ingestion/logs" element={<IngestionLogsPage />} />
-                <Route path="/api-docs" element={<ApiDocsPage />} />
+      <SettingsProvider>
+        <AuthProvider>
+          <BrowserRouter>
+            <Routes>
+              <Route path="/login" element={<LoginPage />} />
+              <Route element={<ProtectedRoute />}>
+                <Route element={<AppLayout />}>
+                  <Route path="/" element={<Dashboard />} />
+                  <Route path="/search" element={<SearchPage />} />
+                  <Route path="/users" element={<UsersPage />} />
+                  <Route path="/credentials" element={<CredentialsPage />} />
+                  <Route path="/ingestion" element={<IngestionPage />} />
+                  <Route path="/ingestion/logs" element={<IngestionLogsPage />} />
+                  <Route path="/api-docs" element={<ApiDocsPage />} />
+                  <Route path="/settings" element={<SettingsPage />} />
+                </Route>
               </Route>
-            </Route>
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
-      </AuthProvider>
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </BrowserRouter>
+        </AuthProvider>
+      </SettingsProvider>
     </TooltipProvider>
   </QueryClientProvider>
 );

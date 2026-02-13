@@ -169,6 +169,20 @@ CREATE INDEX IF NOT EXISTS idx_ingestion_logs_job ON ingestion_logs(job_id);
 CREATE INDEX IF NOT EXISTS idx_ingestion_logs_level ON ingestion_logs(level);
 CREATE INDEX IF NOT EXISTS idx_ingestion_logs_created ON ingestion_logs(created_at DESC);
 
+-- Configurações do sistema
+CREATE TABLE IF NOT EXISTS system_settings (
+    key VARCHAR(100) PRIMARY KEY,
+    value TEXT NOT NULL,
+    updated_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Valores padrão
+INSERT INTO system_settings (key, value) VALUES
+    ('site_name', 'CNPJ Data'),
+    ('site_subtitle', 'Receita Federal'),
+    ('site_description', 'Plataforma de consulta de dados CNPJ da Receita Federal')
+ON CONFLICT (key) DO NOTHING;
+
 -- Enable pg_trgm extension for fuzzy search (optional, may not be available)
 DO $$
 BEGIN
