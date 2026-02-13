@@ -10,7 +10,12 @@ import { Readable } from 'stream';
 // Downloads ZIPs, extracts CSVs, inserts into PostgreSQL
 // =============================================
 
-const BATCH_SIZE = 5000;
+const MAX_PARAMS = 60000; // PostgreSQL limit is 65535
+const DEFAULT_BATCH_SIZE = 5000;
+
+function getBatchSize(columnCount: number): number {
+  return Math.min(DEFAULT_BATCH_SIZE, Math.floor(MAX_PARAMS / columnCount));
+}
 
 // Structured logger that writes to DB
 async function log(jobId: string, level: 'debug' | 'info' | 'warn' | 'error', message: string, details?: string) {
@@ -132,6 +137,7 @@ async function updateJobStatus(jobId: string, status: string, progress: number, 
 }
 
 async function processCSVStream(stream: Readable, config: typeof FILE_CONFIGS[string], jobId: string): Promise<number> {
+  const BATCH_SIZE = getBatchSize(config.columns.length);
   return new Promise((resolve, reject) => {
     let batch: any[][] = [];
     let totalProcessed = 0;
@@ -215,7 +221,7 @@ async function insertBatch(config: typeof FILE_CONFIGS[string], batch: any[][], 
     await client.query(query, allValues);
 
     const newTotal = currentTotal + batch.length;
-    if (newTotal % (BATCH_SIZE * 5) === 0 || batch.length < BATCH_SIZE) {
+    if (newTotal % (getBatchSize(config.columns.length) * 5) === 0 || batch.length < getBatchSize(config.columns.length)) {
       await updateJobStatus(jobId, 'processing', -1, { records_processed: newTotal });
       await log(jobId, 'debug', `Processados ${newTotal.toLocaleString('pt-BR')} registros na tabela ${config.table}`);
     }
