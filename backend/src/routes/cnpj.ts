@@ -218,6 +218,28 @@ router.get('/cnaes', apiKeyAuth, async (_req: AuthRequest, res: Response) => {
   }
 });
 
+// GET /api/v1/municipios - Lista Municípios
+router.get('/municipios', apiKeyAuth, async (req: AuthRequest, res: Response) => {
+  const { uf } = req.query;
+  try {
+    let query = `
+      SELECT DISTINCT m.codigo, m.descricao as nome, est.uf
+      FROM municipios m
+      JOIN estabelecimentos est ON est.municipio = m.codigo
+    `;
+    const params: any[] = [];
+    if (uf) {
+      query += ` WHERE est.uf = $1`;
+      params.push((uf as string).toUpperCase());
+    }
+    query += ` ORDER BY m.descricao`;
+    const result = await pool.query(query, params);
+    res.json({ total: result.rows.length, data: result.rows });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch municípios' });
+  }
+});
+
 // GET /api/v1/search/admin - Search for admin panel (JWT auth)
 router.get('/search/admin', jwtAuth, async (req: AuthRequest, res: Response) => {
   const { cnae, municipio, uf, razao_social, situacao, cnpj, data_abertura_gte, data_abertura_lte, page = '1', limit = '20' } = req.query;

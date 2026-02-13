@@ -142,6 +142,21 @@ const endpoints: Endpoint[] = [
   ]
 }`,
   },
+  {
+    method: 'GET',
+    path: '/api/v1/municipios',
+    description: 'Lista todos os municípios disponíveis na base. Pode filtrar por UF para listar apenas municípios de um estado específico.',
+    params: [
+      { name: 'uf', type: 'query', description: 'Filtrar por UF (2 caracteres). Ex: SP, RJ, MG' },
+    ],
+    responseExample: `{
+  "total": 5570,
+  "data": [
+    { "codigo": "7107", "nome": "BRASILIA", "uf": "DF" },
+    { "codigo": "6001", "nome": "SAO PAULO", "uf": "SP" }
+  ]
+}`,
+  },
 ];
 
 function EndpointTester({ endpoint }: { endpoint: Endpoint }) {
