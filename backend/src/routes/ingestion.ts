@@ -89,7 +89,7 @@ router.post('/start-from-link', async (req: AuthRequest, res: Response) => {
     let typesToProcess = fileTypes;
     if (skip_completed !== false) {
       const completed = await pool.query(
-        `SELECT DISTINCT file_type FROM ingestion_jobs WHERE status = 'completed'`
+        `SELECT DISTINCT file_type FROM ingestion_jobs WHERE status = 'completed' AND records_processed > 0`
       );
       const completedTypes = new Set(completed.rows.map((r: any) => r.file_type));
       typesToProcess = fileTypes.filter(ft => !completedTypes.has(ft));
@@ -181,7 +181,10 @@ router.get('/stats', async (_req: AuthRequest, res: Response) => {
       (SELECT COUNT(*) FROM estabelecimentos) as total_estabelecimentos,
       (SELECT COUNT(*) FROM socios) as total_socios,
       (SELECT COUNT(*) FROM municipios) as total_municipios,
-      (SELECT COUNT(*) FROM cnaes) as total_cnaes
+      (SELECT COUNT(*) FROM cnaes) as total_cnaes,
+      (SELECT COUNT(*) FROM naturezas_juridicas) as total_naturezas,
+      (SELECT COUNT(*) FROM qualificacoes) as total_qualificacoes,
+      (SELECT COUNT(*) FROM paises) as total_paises
   `);
   res.json(stats.rows[0]);
 });
