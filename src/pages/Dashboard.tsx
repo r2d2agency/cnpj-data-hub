@@ -1,4 +1,4 @@
-import { Building2, Search, Users, Key, TrendingUp, Loader2, ScrollText, MapPin, Globe, Scale, Award } from 'lucide-react';
+import { Building2, Search, Users, Key, TrendingUp, Loader2, ScrollText, MapPin, Globe, Scale, Award, FileText } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import StatCard from '@/components/dashboard/StatCard';
 import { fetchDashboardStats, fetchIngestionJobs, fetchIngestionLogs } from '@/lib/api';
@@ -66,12 +66,15 @@ export default function Dashboard() {
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4">
           <StatCard label="Empresas" value={stats?.total_empresas || 0} icon={Building2} />
           <StatCard label="Estabelecimentos" value={stats?.total_estabelecimentos || 0} icon={Search} />
           <StatCard label="Sócios" value={stats?.total_socios || 0} icon={Users} />
           <StatCard label="Municípios" value={stats?.total_municipios || 0} icon={MapPin} />
           <StatCard label="CNAEs" value={stats?.total_cnaes || 0} icon={TrendingUp} />
+          <StatCard label="Naturezas Jurídicas" value={stats?.total_naturezas || 0} icon={Scale} />
+          <StatCard label="Qualificações" value={stats?.total_qualificacoes || 0} icon={Award} />
+          <StatCard label="Países" value={stats?.total_paises || 0} icon={Globe} />
         </div>
       )}
 
