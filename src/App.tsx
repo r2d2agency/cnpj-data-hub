@@ -30,6 +30,7 @@ const App = () => (
           <BrowserRouter>
             <Routes>
               <Route path="/login" element={<LoginPage />} />
+              <Route path="/api-docs" element={<ApiDocsPage />} />
               <Route element={<ProtectedRoute />}>
                 <Route element={<AppLayout />}>
                   <Route path="/" element={<Dashboard />} />
@@ -38,7 +39,6 @@ const App = () => (
                   <Route path="/credentials" element={<CredentialsPage />} />
                   <Route path="/ingestion" element={<IngestionPage />} />
                   <Route path="/ingestion/logs" element={<IngestionLogsPage />} />
-                  <Route path="/api-docs" element={<ApiDocsPage />} />
                   <Route path="/settings" element={<SettingsPage />} />
                 </Route>
               </Route>
