@@ -157,3 +157,12 @@ export function searchEmpresas(params: Record<string, string>) {
   const qs = new URLSearchParams(params).toString();
   return request<any>(`/search/admin?${qs}`);
 }
+
+// Settings
+export function fetchSettings() {
+  return fetch(`${API_BASE}/settings`).then(r => r.json()).then(r => r.data as Record<string, string>);
+}
+
+export function updateSettings(settings: Record<string, string>) {
+  return request<any>('/settings', { method: 'PUT', body: JSON.stringify({ settings }) });
+}

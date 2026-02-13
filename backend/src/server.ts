@@ -11,6 +11,7 @@ import cnpjRoutes from './routes/cnpj';
 import usersRoutes from './routes/users';
 import credentialsRoutes from './routes/credentials';
 import ingestionRoutes from './routes/ingestion';
+import settingsRoutes from './routes/settings';
 
 dotenv.config();
 
@@ -34,6 +35,7 @@ app.use('/api/v1', cnpjRoutes);
 app.use('/api/v1/users', usersRoutes);
 app.use('/api/v1/credentials', credentialsRoutes);
 app.use('/api/v1/ingestion', ingestionRoutes);
+app.use('/api/v1/settings', settingsRoutes);
 
 // Serve frontend static files
 const frontendPath = path.join(__dirname, '../../frontend/dist');

@@ -12,6 +12,7 @@ import {
   LogOut,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSettings } from '@/contexts/SettingsContext';
 
 const navItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
@@ -21,12 +22,14 @@ const navItems = [
   { to: '/ingestion', icon: DatabaseZap, label: 'Ingestão de Dados' },
   { to: '/ingestion/logs', icon: ScrollText, label: 'Logs de Ingestão' },
   { to: '/api-docs', icon: FileText, label: 'Documentação API' },
+  { to: '/settings', icon: Settings, label: 'Configurações' },
 ];
 
 export default function AppSidebar() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+  const { settings } = useSettings();
 
   const handleLogout = () => {
     logout();
@@ -41,9 +44,9 @@ export default function AppSidebar() {
           <Database className="h-5 w-5 text-primary-foreground" />
         </div>
         <div>
-          <h1 className="text-sm font-bold text-sidebar-foreground">CNPJ Data</h1>
+          <h1 className="text-sm font-bold text-sidebar-foreground">{settings.site_name || 'CNPJ Data'}</h1>
           <p className="text-[10px] font-medium text-sidebar-foreground/50 tracking-wider uppercase">
-            Receita Federal
+            {settings.site_subtitle || 'Receita Federal'}
           </p>
         </div>
       </div>
