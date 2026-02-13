@@ -113,23 +113,44 @@ export function startIngestion(url: string, month: string) {
   return request<any>('/ingestion/start-from-link', { method: 'POST', body: JSON.stringify({ url, month, skip_completed: true }) });
 }
 
-export async function uploadIngestionZip(file: File, fileType: string) {
-  const token = getToken();
-  const formData = new FormData();
-  formData.append('file', file);
-  formData.append('file_type', fileType);
+export function uploadIngestionZip(
+  file: File,
+  fileType: string,
+  onProgress?: (percent: number) => void
+): Promise<any> {
+  return new Promise((resolve, reject) => {
+    const token = getToken();
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('file_type', fileType);
 
-  const res = await fetch(`${API_BASE}/ingestion/upload`, {
-    method: 'POST',
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-    body: formData,
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', `${API_BASE}/ingestion/upload`);
+    if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable && onProgress) {
+        onProgress(Math.round((e.loaded / e.total) * 100));
+      }
+    };
+
+    xhr.onload = () => {
+      try {
+        const body = JSON.parse(xhr.responseText);
+        if (xhr.status >= 200 && xhr.status < 300) {
+          onProgress?.(100);
+          resolve(body);
+        } else {
+          reject(new Error(body.error || 'Upload failed'));
+        }
+      } catch {
+        reject(new Error('Upload failed'));
+      }
+    };
+
+    xhr.onerror = () => reject(new Error('Falha na conexão'));
+    xhr.send(formData);
   });
-
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({ error: 'Upload failed' }));
-    throw new Error(body.error || 'Upload failed');
-  }
-  return res.json();
 }
 
 export function clearIngestionJobs(status?: string) {
