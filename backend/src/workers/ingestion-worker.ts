@@ -252,7 +252,6 @@ async function insertBatch(config: typeof FILE_CONFIGS[string], batch: any[][], 
     client.release();
   }
 }
-}
 
 async function downloadAndProcessZip(zipUrl: string, config: typeof FILE_CONFIGS[string], jobId: string): Promise<number> {
   await log(jobId, 'info', `Iniciando download: ${zipUrl}`);
