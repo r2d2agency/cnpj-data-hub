@@ -26,35 +26,50 @@ const endpoints: Endpoint[] = [
     method: 'GET',
     path: '/api/v1/cnpj/:cnpj',
     description: 'Consulta completa de uma empresa por CNPJ (14 dígitos). Retorna dados da empresa, estabelecimento e sócios.',
-    params: [{ name: 'cnpj', type: 'path', required: true, description: 'CNPJ com 14 dígitos (apenas números)' }],
+    params: [{ name: 'cnpj', type: 'path', required: true, description: 'CNPJ com 14 dígitos (apenas números). Ex: 00000000000191' }],
     responseExample: `{
   "empresa": {
     "cnpj_basico": "00000000",
     "razao_social": "EMPRESA EXEMPLO SA",
-    "capital_social": "1000000.00"
+    "capital_social": "1000000.00",
+    "natureza_descricao": "Sociedade Anônima Aberta"
   },
   "estabelecimento": {
+    "cnpj_ordem": "0001",
+    "cnpj_dv": "91",
     "nome_fantasia": "EXEMPLO",
     "situacao_cadastral": "02",
+    "data_inicio_atividade": "19660101",
+    "cnae_principal": "6422100",
     "logradouro": "RUA EXEMPLO",
+    "numero": "100",
+    "bairro": "CENTRO",
+    "cep": "70000000",
     "municipio": "7107",
-    "uf": "SP"
+    "uf": "DF",
+    "municipio_nome": "BRASÍLIA"
   },
   "socios": [
-    { "nome_socio": "JOÃO DA SILVA", "qualificacao_descricao": "Sócio-Administrador" }
+    {
+      "nome_socio": "JOÃO DA SILVA",
+      "qualificacao_descricao": "Sócio-Administrador",
+      "data_entrada": "20200101"
+    }
   ]
 }`,
   },
   {
     method: 'GET',
     path: '/api/v1/search',
-    description: 'Pesquisa avançada de empresas com filtros. Retorna resultados paginados.',
+    description: 'Pesquisa avançada de empresas com múltiplos filtros combinados. Retorna resultados paginados. Ideal para encontrar empresas por CNAE em determinado município e período de abertura. O filtro de data permite no máximo 1 ano de intervalo.',
     params: [
-      { name: 'cnae', type: 'query', description: 'Filtrar por código CNAE (prefixo)' },
-      { name: 'municipio', type: 'query', description: 'Filtrar por nome do município' },
-      { name: 'uf', type: 'query', description: 'Filtrar por UF (2 caracteres)' },
-      { name: 'razao_social', type: 'query', description: 'Filtrar por razão social (busca parcial)' },
-      { name: 'situacao', type: 'query', description: 'Filtrar por situação cadastral' },
+      { name: 'cnae', type: 'query', description: 'Filtrar por código CNAE (prefixo). Ex: 6201 retorna todos que começam com 6201' },
+      { name: 'municipio', type: 'query', description: 'Filtrar por nome do município (busca parcial, case-insensitive). Ex: SAO PAULO' },
+      { name: 'uf', type: 'query', description: 'Filtrar por UF (2 caracteres). Ex: SP, RJ, MG' },
+      { name: 'razao_social', type: 'query', description: 'Filtrar por razão social (busca parcial, case-insensitive). Ex: PETROBRAS' },
+      { name: 'situacao', type: 'query', description: 'Filtrar por situação cadastral. 02 = Ativa, 03 = Suspensa, 04 = Inapta, 08 = Baixada' },
+      { name: 'data_abertura_gte', type: 'query', description: 'Data de abertura mínima no formato YYYYMMDD. Ex: 20240101' },
+      { name: 'data_abertura_lte', type: 'query', description: 'Data de abertura máxima no formato YYYYMMDD. Ex: 20241231. Intervalo máximo: 1 ano (366 dias)' },
       { name: 'page', type: 'query', description: 'Número da página (padrão: 1)' },
       { name: 'limit', type: 'query', description: 'Resultados por página (máx: 100, padrão: 20)' },
     ],
@@ -66,12 +81,22 @@ const endpoints: Endpoint[] = [
   "data": [
     {
       "cnpj_basico": "00000000",
+      "cnpj_ordem": "0001",
+      "cnpj_dv": "91",
       "razao_social": "EMPRESA SA",
+      "capital_social": "500000.00",
       "nome_fantasia": "EXEMPLO",
       "situacao_cadastral": "02",
-      "cnae_principal": "6422100",
-      "municipio_nome": "BRASÍLIA",
-      "uf": "DF"
+      "cnae_principal": "6201501",
+      "cnae_descricao": "Desenvolvimento de programas de computador sob encomenda",
+      "data_inicio_atividade": "20240315",
+      "logradouro": "AV PAULISTA",
+      "numero": "1000",
+      "bairro": "BELA VISTA",
+      "cep": "01310100",
+      "uf": "SP",
+      "municipio_nome": "SAO PAULO",
+      "natureza_descricao": "Sociedade Empresária Limitada"
     }
   ]
 }`,
@@ -79,9 +104,9 @@ const endpoints: Endpoint[] = [
   {
     method: 'POST',
     path: '/api/v1/bulk-search',
-    description: 'Consulta em lote de até 100 CNPJs de uma só vez.',
+    description: 'Consulta em lote de até 100 CNPJs de uma só vez. Retorna dados básicos da empresa e estabelecimento matriz.',
     params: [
-      { name: 'cnpjs', type: 'body', required: true, description: 'Array de CNPJs (apenas números, até 100)' },
+      { name: 'cnpjs', type: 'body', required: true, description: 'Array de CNPJs com 14 dígitos (apenas números). Mínimo: 1, máximo: 100' },
     ],
     bodyExample: `{
   "cnpjs": [
@@ -90,7 +115,16 @@ const endpoints: Endpoint[] = [
   ]
 }`,
     responseExample: `{
-  "results": [...],
+  "results": [
+    {
+      "cnpj_basico": "00000000",
+      "razao_social": "BANCO DO BRASIL SA",
+      "nome_fantasia": "BANCO DO BRASIL",
+      "situacao_cadastral": "02",
+      "cnae_principal": "6422100",
+      "uf": "DF"
+    }
+  ],
   "found": 2,
   "not_found": 0
 }`,
@@ -98,10 +132,12 @@ const endpoints: Endpoint[] = [
   {
     method: 'GET',
     path: '/api/v1/cnaes',
-    description: 'Lista todos os códigos CNAE disponíveis na base.',
+    description: 'Lista todos os códigos CNAE disponíveis na base. Útil para descobrir os códigos corretos antes de usar o filtro de CNAE no endpoint /search.',
     params: [],
     responseExample: `{
   "data": [
+    { "codigo": "0111301", "descricao": "Cultivo de arroz" },
+    { "codigo": "6201501", "descricao": "Desenvolvimento de programas de computador sob encomenda" },
     { "codigo": "6422100", "descricao": "Bancos múltiplos, com carteira comercial" }
   ]
 }`,
@@ -271,6 +307,37 @@ export default function ApiDocsPage() {
         <p className="text-sm text-muted-foreground">
           Crie API keys na seção <strong>Credenciais API</strong> do painel administrativo. O rate limit é controlado por credencial.
         </p>
+      </div>
+
+      {/* Usage Examples */}
+      <div className="rounded-lg border bg-card p-5 space-y-3">
+        <h2 className="text-base font-semibold text-foreground">Exemplos de Uso</h2>
+        <p className="text-sm text-muted-foreground mb-3">Combinações de filtros mais comuns:</p>
+        <div className="space-y-3">
+          <div>
+            <p className="text-xs font-semibold text-foreground mb-1">Empresas de TI em São Paulo abertas em 2024:</p>
+            <pre className="bg-muted rounded p-2 text-xs font-mono overflow-x-auto">GET /api/v1/search?cnae=6201&municipio=SAO%20PAULO&uf=SP&data_abertura_gte=20240101&data_abertura_lte=20241231</pre>
+          </div>
+          <div>
+            <p className="text-xs font-semibold text-foreground mb-1">Restaurantes ativos no Rio de Janeiro:</p>
+            <pre className="bg-muted rounded p-2 text-xs font-mono overflow-x-auto">GET /api/v1/search?cnae=5611&municipio=RIO%20DE%20JANEIRO&situacao=02</pre>
+          </div>
+          <div>
+            <p className="text-xs font-semibold text-foreground mb-1">Buscar por nome e filtrar por estado:</p>
+            <pre className="bg-muted rounded p-2 text-xs font-mono overflow-x-auto">GET /api/v1/search?razao_social=PETROBRAS&uf=RJ&limit=50</pre>
+          </div>
+        </div>
+      </div>
+
+      {/* Limits Info */}
+      <div className="rounded-lg border bg-card p-5 space-y-3">
+        <h2 className="text-base font-semibold text-foreground">Limites e Restrições</h2>
+        <ul className="text-sm text-muted-foreground space-y-1.5 list-disc list-inside">
+          <li>O filtro de data de abertura aceita no máximo <strong>1 ano (366 dias)</strong> de intervalo</li>
+          <li>Paginação: máximo de <strong>100 resultados</strong> por página</li>
+          <li>Consulta em lote: máximo de <strong>100 CNPJs</strong> por requisição</li>
+          <li>Rate limit controlado por API Key (configurável por credencial)</li>
+        </ul>
       </div>
 
       {/* Endpoints */}
