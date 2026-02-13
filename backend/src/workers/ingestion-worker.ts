@@ -238,7 +238,14 @@ async function downloadAndProcessZip(zipUrl: string, config: typeof FILE_CONFIGS
     url: zipUrl,
     responseType: 'stream',
     timeout: 600000,
+    maxRedirects: 10,
   });
+
+  // Validate we got a binary file, not an HTML page
+  const contentType = response.headers['content-type'] || '';
+  if (contentType.includes('text/html')) {
+    throw new Error(`Download retornou HTML ao invés de ZIP. URL pode estar incorreta: ${zipUrl}`);
+  }
 
   const contentLength = response.headers['content-length'];
   if (contentLength) {
@@ -290,7 +297,11 @@ export async function processJob(jobId: string, fileType: string, baseUrl: strin
         ? `${config.zipPrefix}.zip`
         : `${config.zipPrefix}${i}.zip`;
 
-      const zipUrl = `${baseUrl}/${zipName}`;
+      // Build Nextcloud direct download URL
+      // Input: https://arquivos.receitafederal.gov.br/index.php/s/SHARE_ID
+      // Output: https://arquivos.receitafederal.gov.br/index.php/s/SHARE_ID/download?path=/&files=FileName.zip
+      const cleanBase = baseUrl.replace(/[\?\/]+$/, '');
+      const zipUrl = `${cleanBase}/download?path=/&files=${encodeURIComponent(zipName)}`;
 
       try {
         const records = await downloadAndProcessZip(zipUrl, config, jobId);
