@@ -72,7 +72,7 @@ router.get('/cnpj/:cnpj', apiKeyAuth, async (req: AuthRequest, res: Response) =>
 // GET /api/v1/search - Pesquisa avançada
 router.get('/search', apiKeyAuth, async (req: AuthRequest, res: Response) => {
   const start = Date.now();
-  const { cnae, municipio, uf, razao_social, situacao, data_abertura_gte, data_abertura_lte, page = '1', limit = '20' } = req.query;
+  const { cnae, municipio, uf, razao_social, nome_fantasia, situacao, data_abertura_gte, data_abertura_lte, page = '1', limit = '20' } = req.query;
 
   // Validate date range: max 1 year
   if (data_abertura_gte && data_abertura_lte) {
@@ -107,6 +107,10 @@ router.get('/search', apiKeyAuth, async (req: AuthRequest, res: Response) => {
   if (razao_social) {
     conditions.push(`e.razao_social ILIKE $${paramIndex++}`);
     params.push(`%${razao_social}%`);
+  }
+  if (nome_fantasia) {
+    conditions.push(`est.nome_fantasia ILIKE $${paramIndex++}`);
+    params.push(`%${nome_fantasia}%`);
   }
   if (situacao) {
     conditions.push(`est.situacao_cadastral = $${paramIndex++}`);
@@ -242,7 +246,7 @@ router.get('/municipios', apiKeyAuth, async (req: AuthRequest, res: Response) =>
 
 // GET /api/v1/search/admin - Search for admin panel (JWT auth)
 router.get('/search/admin', jwtAuth, async (req: AuthRequest, res: Response) => {
-  const { cnae, municipio, uf, razao_social, situacao, cnpj, data_abertura_gte, data_abertura_lte, page = '1', limit = '20' } = req.query;
+  const { cnae, municipio, uf, razao_social, nome_fantasia, situacao, cnpj, data_abertura_gte, data_abertura_lte, page = '1', limit = '20' } = req.query;
 
   // Validate date range: max 1 year
   if (data_abertura_gte && data_abertura_lte) {
@@ -282,6 +286,10 @@ router.get('/search/admin', jwtAuth, async (req: AuthRequest, res: Response) => 
   if (razao_social) {
     conditions.push(`e.razao_social ILIKE $${paramIndex++}`);
     params.push(`%${razao_social}%`);
+  }
+  if (nome_fantasia) {
+    conditions.push(`est.nome_fantasia ILIKE $${paramIndex++}`);
+    params.push(`%${nome_fantasia}%`);
   }
   if (situacao) {
     conditions.push(`est.situacao_cadastral = $${paramIndex++}`);

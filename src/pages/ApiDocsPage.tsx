@@ -67,6 +67,7 @@ const endpoints: Endpoint[] = [
       { name: 'municipio', type: 'query', description: 'Filtrar por nome do município (busca parcial, case-insensitive). Ex: SAO PAULO' },
       { name: 'uf', type: 'query', description: 'Filtrar por UF (2 caracteres). Ex: SP, RJ, MG' },
       { name: 'razao_social', type: 'query', description: 'Filtrar por razão social (busca parcial, case-insensitive). Ex: PETROBRAS' },
+      { name: 'nome_fantasia', type: 'query', description: 'Filtrar por nome fantasia (busca parcial, case-insensitive). Ex: BANCO DO BRASIL' },
       { name: 'situacao', type: 'query', description: 'Filtrar por situação cadastral. 02 = Ativa, 03 = Suspensa, 04 = Inapta, 08 = Baixada' },
       { name: 'data_abertura_gte', type: 'query', description: 'Data de abertura mínima no formato YYYYMMDD. Ex: 20240101' },
       { name: 'data_abertura_lte', type: 'query', description: 'Data de abertura máxima no formato YYYYMMDD. Ex: 20241231. Intervalo máximo: 1 ano (366 dias)' },
