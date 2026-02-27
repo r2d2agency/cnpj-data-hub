@@ -11,6 +11,7 @@ export default function SearchPage() {
   const [municipio, setMunicipio] = useState('');
   const [uf, setUf] = useState('');
   const [razaoSocial, setRazaoSocial] = useState('');
+  const [nomeFantasia, setNomeFantasia] = useState('');
   const [cnpj, setCnpj] = useState('');
   const [dataAberturaGte, setDataAberturaGte] = useState('');
   const [dataAberturaLte, setDataAberturaLte] = useState('');
@@ -20,7 +21,7 @@ export default function SearchPage() {
   const [selected, setSelected] = useState<any | null>(null);
 
   const handleSearch = async () => {
-    if (!cnae && !municipio && !uf && !razaoSocial && !cnpj) {
+    if (!cnae && !municipio && !uf && !razaoSocial && !nomeFantasia && !cnpj) {
       toast({ title: 'Filtro obrigatório', description: 'Preencha pelo menos um filtro (CNAE, Município, UF, Razão Social ou CNPJ).', variant: 'destructive' });
       return;
     }
@@ -47,6 +48,7 @@ export default function SearchPage() {
       if (municipio) params.municipio = municipio;
       if (uf) params.uf = uf;
       if (razaoSocial) params.razao_social = razaoSocial;
+      if (nomeFantasia) params.nome_fantasia = nomeFantasia;
       if (cnpj) params.cnpj = cnpj;
       if (dataAberturaGte) params.data_abertura_gte = dataAberturaGte.replace(/-/g, '');
       if (dataAberturaLte) params.data_abertura_lte = dataAberturaLte.replace(/-/g, '');
@@ -82,7 +84,7 @@ export default function SearchPage() {
       </div>
 
       <div className="rounded-lg border bg-card p-5 space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
           <div className="space-y-1.5">
             <Label className="text-xs text-muted-foreground">CNPJ</Label>
             <Input placeholder="00000000000191" value={cnpj} onChange={(e) => setCnpj(e.target.value)} />
@@ -94,6 +96,10 @@ export default function SearchPage() {
           <div className="space-y-1.5">
             <Label className="text-xs text-muted-foreground">Razão Social</Label>
             <Input placeholder="Nome da empresa" value={razaoSocial} onChange={(e) => setRazaoSocial(e.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">Nome Fantasia</Label>
+            <Input placeholder="Nome fantasia" value={nomeFantasia} onChange={(e) => setNomeFantasia(e.target.value)} />
           </div>
         </div>
 
