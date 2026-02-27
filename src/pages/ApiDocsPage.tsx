@@ -341,8 +341,12 @@ export default function ApiDocsPage() {
             <pre className="bg-muted rounded p-2 text-xs font-mono overflow-x-auto">GET /api/v1/search?cnae=5611&municipio=RIO%20DE%20JANEIRO&situacao=02</pre>
           </div>
           <div>
-            <p className="text-xs font-semibold text-foreground mb-1">Buscar por nome e filtrar por estado:</p>
+            <p className="text-xs font-semibold text-foreground mb-1">Buscar por razão social e filtrar por estado:</p>
             <pre className="bg-muted rounded p-2 text-xs font-mono overflow-x-auto">GET /api/v1/search?razao_social=PETROBRAS&uf=RJ&limit=50</pre>
+          </div>
+          <div>
+            <p className="text-xs font-semibold text-foreground mb-1">Buscar por nome fantasia:</p>
+            <pre className="bg-muted rounded p-2 text-xs font-mono overflow-x-auto">GET /api/v1/search?nome_fantasia=BANCO%20DO%20BRASIL&situacao=02</pre>
           </div>
         </div>
       </div>
